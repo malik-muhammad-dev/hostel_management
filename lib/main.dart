@@ -29,6 +29,11 @@ Future<void> main() async {
     windowManager.waitUntilReadyToShow(windowOptions, () async {
       await windowManager.show();
       await windowManager.focus();
+
+      // A small delay ensures the native window handle is fully ready
+      // before maximizing — calling maximize() immediately can silently
+      // fail on some Windows setups.
+      await Future.delayed(const Duration(milliseconds: 200));
       await windowManager.maximize();
     });
   }
