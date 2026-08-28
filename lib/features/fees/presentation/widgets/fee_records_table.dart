@@ -232,10 +232,11 @@ class _FeeRecordsTableState
       final balance =
           rawBalance < 0 ? 0.0 : rawBalance;
 
-      final status = _getStatus(
-        paid: paid,
-        balance: balance,
-      );
+     final status = _getStatus(
+  monthlyFee: monthlyFee,   
+  paid: paid,
+  balance: balance,
+);
 
       if (_statusFilter != 'All' &&
           status != _statusFilter) {
@@ -389,20 +390,28 @@ class _FeeRecordsTableState
     return null;
   }
 
-  String _getStatus({
-    required double paid,
-    required double balance,
-  }) {
-    if (balance <= 0) {
-      return 'Paid';
-    }
-
-    if (paid > 0) {
-      return 'Partial';
-    }
-
-    return 'Pending';
+ String _getStatus({
+  required double monthlyFee,   // <-- added
+  required double paid,
+  required double balance,
+}) {
+  // A student never charged or paid anything (monthlyFee: 0, paid: 0,
+  // balance: 0) used to fall into `balance <= 0` below and show "Paid" —
+  // misleading, since nothing was ever billed to them yet.
+  if (monthlyFee <= 0 && paid <= 0) {
+    return 'Not Billed';
   }
+
+  if (balance <= 0) {
+    return 'Paid';
+  }
+
+  if (paid > 0) {
+    return 'Partial';
+  }
+
+  return 'Pending';
+}
 
   String _formatAmount(double amount) {
     final formatted = amount
