@@ -9,6 +9,12 @@ class DashboardStatCard extends StatelessWidget {
   final IconData icon;
   final Color accentColor;
 
+  // Optional — when set, a small pencil/edit button is shown in the
+  // card's top-right corner. Only the "Total Amount" card uses this (to
+  // let the opening balance be set/updated); every other card leaves
+  // this null and renders exactly as before.
+  final VoidCallback? onEdit;
+
   const DashboardStatCard({
     super.key,
     required this.title,
@@ -16,6 +22,7 @@ class DashboardStatCard extends StatelessWidget {
     required this.subtitle,
     required this.icon,
     this.accentColor = AppColors.primary,
+    this.onEdit,
   });
 
   @override
@@ -34,14 +41,31 @@ class DashboardStatCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: accentColor.withValues(alpha: 0.16),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: accentColor, size: 22),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: accentColor.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: accentColor, size: 22),
+              ),
+
+              if (onEdit != null)
+                IconButton(
+                  tooltip: 'Set opening balance',
+                  onPressed: onEdit,
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(
+                    Icons.edit_outlined,
+                    size: 18,
+                    color: accentColor,
+                  ),
+                ),
+            ],
           ),
 
           const SizedBox(height: 16),

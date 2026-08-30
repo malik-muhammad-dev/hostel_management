@@ -22,6 +22,11 @@ import 'package:hostel_management/features/students/data/datasources/student_doc
 import 'package:hostel_management/features/students/data/repositories/student_document_repository.dart';
 import 'package:hostel_management/features/students/presentation/controllers/student_document_controller.dart';
 
+import 'package:hostel_management/features/settings/data/datasource/app_settings_data_source.dart' show AppSettingsDataSource;
+import 'package:hostel_management/features/settings/data/datasource/sqlite_app_settings_data_source.dart' show SqliteAppSettingsDataSource;
+import 'package:hostel_management/features/settings/data/repositories/app_settings_repository.dart' show AppSettingsRepository;
+import 'package:hostel_management/features/settings/presentation/controllers/app_settings_controller.dart' show AppSettingsController;
+
 import '../../core/widgets/app_shell.dart';
 import '../../features/fees/data/datasources/fee_data_source.dart';
 import '../../features/fees/data/datasources/sqlite_fee_data_source.dart';
@@ -180,6 +185,25 @@ Get.lazyPut<ReportsController>(
 
 Get.lazyPut<DashboardController>(
   () => DashboardController(),
+  fenix: true,
+);
+
+// ---------------------------------------------------------------------------
+// App Settings (currently just Opening Balance)
+// ---------------------------------------------------------------------------
+
+Get.lazyPut<AppSettingsDataSource>(
+  () => SqliteAppSettingsDataSource(),
+  fenix: true,
+);
+
+Get.lazyPut<AppSettingsRepository>(
+  () => AppSettingsRepository(Get.find<AppSettingsDataSource>()),
+  fenix: true,
+);
+
+Get.lazyPut<AppSettingsController>(
+  () => AppSettingsController(Get.find<AppSettingsRepository>()),
   fenix: true,
 );
   }

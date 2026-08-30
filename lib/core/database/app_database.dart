@@ -39,7 +39,7 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._internal();
 
   static const _dbName = 'onims_hostel.db';
-  static const _dbVersion = 4;
+  static const _dbVersion = 5;
 
   Database? _database;
 
@@ -219,6 +219,23 @@ class AppDatabase {
     await db.execute(
       'CREATE INDEX idx_expenses_category ON expenses(category)',
     );
+
+    // -------------------------------------------------------------------------
+    // A single-row settings table — currently just the one overall
+    // "Opening Balance" figure (money already on hand before the hostel
+    // started using this app). `CHECK (id = 1)` keeps it a true singleton;
+    // the row is always inserted here so app code can always assume it
+    // exists and just UPDATE it, never INSERT.
+    // -------------------------------------------------------------------------
+    await db.execute('''
+      CREATE TABLE app_settings (
+          id              INTEGER PRIMARY KEY CHECK (id = 1),
+          opening_balance REAL NOT NULL DEFAULT 0
+      )
+    ''');
+    await db.execute(
+      'INSERT INTO app_settings (id, opening_balance) VALUES (1, 0)',
+    );
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -281,6 +298,22 @@ class AppDatabase {
       // rather than breaking.
       await db.execute(
         "ALTER TABLE expenses ADD COLUMN category TEXT NOT NULL DEFAULT 'Miscellaneous Expense'",
+      );
+    }
+
+    if (oldVersion < 5) {
+      // New "Opening Balance" setting — the money the hostel already had
+      // on hand before switching to this app. Defaults to 0 for existing
+      // installs; the client can set the real figure once from the
+      // dashboard after updating.
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS app_settings (
+            id              INTEGER PRIMARY KEY CHECK (id = 1),
+            opening_balance REAL NOT NULL DEFAULT 0
+        )
+      ''');
+      await db.execute(
+        'INSERT OR IGNORE INTO app_settings (id, opening_balance) VALUES (1, 0)',
       );
     }
   }

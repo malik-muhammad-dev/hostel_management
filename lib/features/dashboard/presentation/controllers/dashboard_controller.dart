@@ -2,6 +2,8 @@ import 'package:get/get.dart';
 
 import '../../../expenses/presentation/controllers/expense_controller.dart';
 import '../../../fees/presentation/controllers/fee_controller.dart';
+import '../../../settings/presentation/controllers/app_settings_controller.dart';
+import '../../../students/data/models/student_model.dart';
 import '../../../students/presentation/controllers/student_controller.dart';
 
 // =============================================================================
@@ -19,6 +21,8 @@ class DashboardController extends GetxController {
   final StudentController studentController = Get.find<StudentController>();
   final FeeController feeController = Get.find<FeeController>();
   final ExpenseController expenseController = Get.find<ExpenseController>();
+  final AppSettingsController settingsController =
+      Get.find<AppSettingsController>();
 
   static const _monthNames = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -77,6 +81,74 @@ class DashboardController extends GetxController {
     if (expected <= 0) return 0;
     final rate = (collectedThisMonth / expected) * 100;
     return rate.clamp(0, 100);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Students who owe this month — paid vs total.
+  //
+  // "Owe this month" = active students actually enrolled by this month
+  // (same enrollment check FeeController already uses everywhere else —
+  // one definition of "owes", not a second one invented here). "Paid" =
+  // that student's balance for this month is fully cleared.
+  // ---------------------------------------------------------------------------
+
+  List<StudentModel> get _studentsWhoOweThisMonth {
+    final month = _currentMonth();
+
+    return studentController.activeStudents
+        .where(
+          (student) =>
+              student.id != null &&
+              feeController.isStudentEnrolledInMonth(student, month),
+        )
+        .toList();
+  }
+
+  int get totalStudentsWhoOwe => _studentsWhoOweThisMonth.length;
+
+  int get studentsPaidThisMonth {
+    final month = _currentMonth();
+
+    return _studentsWhoOweThisMonth.where((student) {
+      final summary = feeController.computeFeeSummaryForMonth(
+        student.id!,
+        month,
+      );
+      final balance = summary.feePending < 0 ? 0.0 : summary.feePending;
+      return balance <= 0;
+    }).length;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Total Amount — Opening Balance + all-time collected − all-time
+  // expenses.
+  //
+  // Deliberately NOT scoped to active students or to any single month —
+  // this answers "how much money does the hostel actually have right
+  // now," so it counts every payment ever recorded (even one from a
+  // student who has since become inactive/archived — that money was
+  // still genuinely received) and every expense ever recorded.
+  // ---------------------------------------------------------------------------
+
+  double get allTimeCollected => feeController.payments.fold<double>(
+        0.0,
+        (sum, payment) => sum + payment.amountReceived,
+      );
+
+  double get allTimeExpenses => expenseController.expenses.fold<double>(
+        0.0,
+        (sum, expense) => sum + expense.amount,
+      );
+
+  double get totalAmount =>
+      settingsController.openingBalance.value +
+      allTimeCollected -
+      allTimeExpenses;
+
+  double get openingBalance => settingsController.openingBalance.value;
+
+  Future<void> setOpeningBalance(double value) {
+    return settingsController.setOpeningBalance(value);
   }
 
   // ---------------------------------------------------------------------------

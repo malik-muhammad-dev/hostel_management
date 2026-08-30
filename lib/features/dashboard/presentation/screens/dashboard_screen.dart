@@ -13,10 +13,79 @@ class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
   String _formatAmount(double amount) {
-    final formatted = amount
+    return 'Rs. ${_formatNumber(amount)}';
+  }
+
+  String _formatNumber(double amount) {
+    return amount
         .toStringAsFixed(0)
         .replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => ',');
-    return 'Rs. $formatted';
+  }
+
+  Future<void> _showEditOpeningBalanceDialog(
+    BuildContext context,
+    DashboardController controller,
+  ) async {
+    final textController = TextEditingController(
+      text: controller.openingBalance == 0
+          ? ''
+          : controller.openingBalance.toStringAsFixed(0),
+    );
+
+    final errorText = ''.obs;
+
+    final result = await showDialog<double>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Set Opening Balance'),
+          content: Obx(
+            () => TextField(
+              controller: textController,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(),
+              decoration: InputDecoration(
+                prefixText: 'Rs. ',
+                hintText: 'e.g. 20000',
+                errorText: errorText.value.isEmpty ? null : errorText.value,
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                // Strip anything that isn't a digit or a decimal point
+                // (commas, spaces, "Rs.") before parsing — typing the
+                // number WITH commas (e.g. "20,000", which people
+                // naturally do) used to silently fail and save 0
+                // instead of the intended amount.
+                final cleaned = textController.text
+                    .replaceAll(RegExp(r'[^0-9.]'), '')
+                    .trim();
+
+                final value = double.tryParse(cleaned);
+
+                if (cleaned.isEmpty || value == null) {
+                  errorText.value = 'Enter a valid number';
+                  return;
+                }
+
+                Navigator.of(context).pop(value);
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result != null) {
+      await controller.setOpeningBalance(result);
+    }
   }
 
   @override
@@ -42,6 +111,12 @@ class DashboardScreen extends StatelessWidget {
             final profit = controller.netProfitThisMonth;
             final isProfitable = profit >= 0;
 
+            final totalWhoOwe = controller.totalStudentsWhoOwe;
+            final paid = controller.studentsPaidThisMonth;
+
+            final collected = controller.collectedThisMonth;
+            final expected = controller.expectedThisMonth;
+
             return LayoutBuilder(
               builder: (context, constraints) {
                 final isNarrow = constraints.maxWidth < 900;
@@ -50,14 +125,17 @@ class DashboardScreen extends StatelessWidget {
                   DashboardStatCard(
                     title: 'Active Students',
                     value: '${controller.totalActiveStudents}',
-                    subtitle: 'Currently enrolled',
+                    subtitle: totalWhoOwe == 0
+                        ? 'Currently enrolled'
+                        : '$paid/$totalWhoOwe paid this month',
                     icon: Icons.people_alt_rounded,
                     accentColor: const Color(0xFF3B7DC4),
                   ),
                   DashboardStatCard(
                     title: 'Collected',
-                    value: _formatAmount(controller.collectedThisMonth),
-                    subtitle: 'This month',
+                    value:
+                        '${_formatNumber(collected)} / ${_formatNumber(expected)}',
+                    subtitle: 'Collected / Expected this month',
                     icon: Icons.payments_rounded,
                     accentColor: AppColors.success,
                   ),
@@ -78,9 +156,22 @@ class DashboardScreen extends StatelessWidget {
                     accentColor:
                         isProfitable ? AppColors.primary : AppColors.error,
                   ),
+                  DashboardStatCard(
+                    title: 'Total Amount',
+                    value: _formatAmount(controller.totalAmount),
+                    subtitle:
+                        'Opening balance + collected − expenses (all-time)',
+                    icon: Icons.account_balance_wallet_rounded,
+                    accentColor: const Color(0xFF7C5CBF),
+                    onEdit: () =>
+                        _showEditOpeningBalanceDialog(context, controller),
+                  ),
                 ];
 
                 if (isNarrow) {
+                  // Narrow window — 2 per row, same wrapping style the
+                  // old 4-card layout already used, just one extra row
+                  // for the 5th card.
                   return Column(
                     children: [
                       Row(
@@ -98,16 +189,41 @@ class DashboardScreen extends StatelessWidget {
                           Expanded(child: cards[3]),
                         ],
                       ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(child: cards[4]),
+                          const SizedBox(width: 16),
+                          const Expanded(child: SizedBox()),
+                        ],
+                      ),
                     ],
                   );
                 }
 
-                return Row(
+                // Wide window — 3-and-2 across two rows. A single row of
+                // all 5 (as the old 4-card layout did on wide screens)
+                // gets too cramped to read comfortably.
+                return Column(
                   children: [
-                    for (var i = 0; i < cards.length; i++) ...[
-                      if (i != 0) const SizedBox(width: 16),
-                      Expanded(child: cards[i]),
-                    ],
+                    Row(
+                      children: [
+                        for (var i = 0; i < 3; i++) ...[
+                          if (i != 0) const SizedBox(width: 16),
+                          Expanded(child: cards[i]),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(child: cards[3]),
+                        const SizedBox(width: 16),
+                        Expanded(child: cards[4]),
+                        const SizedBox(width: 16),
+                        const Expanded(child: SizedBox()),
+                      ],
+                    ),
                   ],
                 );
               },
