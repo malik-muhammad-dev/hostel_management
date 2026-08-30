@@ -39,7 +39,7 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._internal();
 
   static const _dbName = 'onims_hostel.db';
-  static const _dbVersion = 5;
+  static const _dbVersion = 6;
 
   Database? _database;
 
@@ -75,6 +75,24 @@ class AppDatabase {
     await db.execute('PRAGMA foreign_keys = ON');
   }
 
+  // ---------------------------------------------------------------------------
+  // Student profile photos — stored as real files on disk (not in SQLite
+  // as a BLOB), same application-support directory as the database itself
+  // so they survive `flutter clean` and rebuilds. Only the resulting path
+  // is stored in the `students.photo_path` column.
+  // ---------------------------------------------------------------------------
+
+  Future<Directory> get photosDirectory async {
+    final supportDir = await getApplicationSupportDirectory();
+    final dir = Directory(join(supportDir.path, 'student_photos'));
+
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+
+    return dir;
+  }
+
   Future<void> _onCreate(Database db, int version) async {
     await db.execute('''
       CREATE TABLE users (
@@ -96,6 +114,7 @@ class AppDatabase {
           date_of_birth               TEXT,
           gender                      TEXT,
           address                     TEXT,
+          photo_path                  TEXT,
           guardian_name               TEXT,
           guardian_relationship       TEXT,
           guardian_cnic               TEXT,
@@ -314,6 +333,16 @@ class AppDatabase {
       ''');
       await db.execute(
         'INSERT OR IGNORE INTO app_settings (id, opening_balance) VALUES (1, 0)',
+      );
+    }
+
+    if (oldVersion < 6) {
+      // Student profile photo — stores the path to a copy of the picked
+      // image kept under `photosDirectory` (see above), not the image
+      // itself. NULL for every existing student until they're re-saved
+      // with a photo attached.
+      await db.execute(
+        'ALTER TABLE students ADD COLUMN photo_path TEXT',
       );
     }
   }

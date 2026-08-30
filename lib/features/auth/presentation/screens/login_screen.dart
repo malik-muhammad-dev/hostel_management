@@ -109,70 +109,90 @@ class _HeroPanel extends StatelessWidget {
             child: _softCircle(70, 0.10),
           ),
 
+          // Wrapped in a scroll view that only ever kicks in on a short
+          // window — a plain Column here would try to center within
+          // whatever height it's given and throw a render overflow the
+          // moment the window got shorter than the content (logo +
+          // title + description). ConstrainedBox(minHeight: ...) keeps
+          // the original centered look on any normal-sized window; it
+          // only starts scrolling once there's genuinely not enough
+          // room, instead of erroring.
           Padding(
             padding: const EdgeInsets.all(56),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 76,
-                  height: 76,
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.18),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
-                      ),
-                    ],
-                  ),
-                  child: Image.asset('assets/images/logo.png'),
-                ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 76,
+                          height: 76,
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.18),
+                                blurRadius: 20,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: Image.asset('assets/images/logo.png'),
+                        ),
 
-                const SizedBox(height: 32),
+                        const SizedBox(height: 32),
 
-                Text(
-                  AppConstants.appName,
-                  style: const TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.4,
-                    height: 1.15,
-                    color: Colors.white,
-                  ),
-                ),
+                        Text(
+                          AppConstants.appName,
+                          style: const TextStyle(
+                            fontSize: 30,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.4,
+                            height: 1.15,
+                            color: Colors.white,
+                          ),
+                        ),
 
-                const SizedBox(height: 10),
+                        const SizedBox(height: 10),
 
-                Text(
-                  'HOSTEL MANAGEMENT SYSTEM',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 1.6,
-                    color: AppColors.accentGold.withValues(alpha: 0.95),
-                  ),
-                ),
+                        Text(
+                          'HOSTEL MANAGEMENT SYSTEM',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.6,
+                            color: AppColors.accentGold.withValues(alpha: 0.95),
+                          ),
+                        ),
 
-                const SizedBox(height: 24),
+                        const SizedBox(height: 24),
 
-                SizedBox(
-                  width: 340,
-                  child: Text(
-                    'A single, secure record for every student\'s stay — '
-                    'admissions, fees, and daily hostel operations in one place.',
-                    style: TextStyle(
-                      fontSize: 14.5,
-                      height: 1.55,
-                      color: Colors.white.withValues(alpha: 0.82),
+                        SizedBox(
+                          width: 340,
+                          child: Text(
+                            'A single, secure record for every student\'s stay — '
+                            'admissions, fees, and daily hostel operations in one place.',
+                            style: TextStyle(
+                              fontSize: 14.5,
+                              height: 1.55,
+                              color: Colors.white.withValues(alpha: 0.82),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              ],
+                );
+              },
             ),
           ),
 

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../../../expenses/presentation/controllers/expense_controller.dart';
@@ -130,24 +131,72 @@ class DashboardController extends GetxController {
   // still genuinely received) and every expense ever recorded.
   // ---------------------------------------------------------------------------
 
-  double get allTimeCollected => feeController.payments.fold<double>(
-        0.0,
-        (sum, payment) => sum + payment.amountReceived,
-      );
+  double get allTimeCollected {
+    debugPrint(
+      '[TOTALS] --- allTimeCollected: ${feeController.payments.length} '
+      'payment record(s) in memory ---',
+    );
 
-  double get allTimeExpenses => expenseController.expenses.fold<double>(
-        0.0,
-        (sum, expense) => sum + expense.amount,
+    double sum = 0.0;
+    for (final payment in feeController.payments) {
+      debugPrint(
+        '[TOTALS]   payment id=${payment.id} studentId=${payment.studentId} '
+        'feeMonth=${payment.feeMonth} amountReceived=${payment.amountReceived}',
       );
+      sum += payment.amountReceived;
+    }
 
-  double get totalAmount =>
-      settingsController.openingBalance.value +
-      allTimeCollected -
-      allTimeExpenses;
+    debugPrint('[TOTALS] allTimeCollected TOTAL = $sum');
+    return sum;
+  }
+
+  double get allTimeExpenses {
+    debugPrint(
+      '[TOTALS] --- allTimeExpenses: ${expenseController.expenses.length} '
+      'expense record(s) in memory ---',
+    );
+
+    double sum = 0.0;
+    for (final expense in expenseController.expenses) {
+      debugPrint(
+        '[TOTALS]   expense id=${expense.id} date=${expense.date} '
+        'category=${expense.category} amount=${expense.amount}',
+      );
+      sum += expense.amount;
+    }
+
+    debugPrint('[TOTALS] allTimeExpenses TOTAL = $sum');
+    return sum;
+  }
+
+  double get totalAmount {
+    final opening = settingsController.openingBalance.value;
+    final collected = allTimeCollected;
+    final expenses = allTimeExpenses;
+    final result = opening + collected - expenses;
+
+    debugPrint(
+      '[TOTALS] totalAmount = openingBalance($opening) '
+      '+ allTimeCollected($collected) − allTimeExpenses($expenses) '
+      '= $result',
+    );
+    debugPrint(
+      '[TOTALS] for comparison — THIS MONTH ONLY: '
+      'collectedThisMonth=$collectedThisMonth, '
+      'expensesThisMonth=$expensesThisMonth',
+    );
+
+    return result;
+  }
 
   double get openingBalance => settingsController.openingBalance.value;
 
   Future<void> setOpeningBalance(double value) {
+    debugPrint(
+      '[SETTINGS] DashboardController.setOpeningBalance($value) — '
+      'this DashboardController: $hashCode, '
+      'settingsController: ${settingsController.hashCode}',
+    );
     return settingsController.setOpeningBalance(value);
   }
 

@@ -64,7 +64,7 @@ class StudentPhotoPicker extends StatelessWidget {
       return;
     }
 
-    controller.setSelectedPhoto(
+    await controller.setSelectedPhoto(
       File(image.path),
     );
   }
@@ -99,6 +99,16 @@ class StudentPhotoPicker extends StatelessWidget {
                     : Image.file(
                         photo,
                         fit: BoxFit.cover,
+                        // The stored path may no longer exist on disk —
+                        // e.g. app data was wiped/moved — fall back to
+                        // the empty state instead of an error screen.
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Icon(
+                            Icons.add_a_photo_outlined,
+                            size: 28,
+                            color: AppColors.textSecondary,
+                          );
+                        },
                       ),
               ),
             ),

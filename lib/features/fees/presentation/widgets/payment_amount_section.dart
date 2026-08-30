@@ -54,6 +54,20 @@ class PaymentAmountSection extends StatelessWidget {
 
               const SizedBox(width: 18),
 
+              // Optional — entirely at the admin's discretion. Left blank,
+              // it parses to 0 and the Total Due / Remaining Balance are
+              // unaffected.
+              Expanded(
+                child: PaymentField(
+                  label: 'Discount (optional)',
+                  hint: 'e.g. 2000',
+                  controller: controller.discountController,
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+
+              const SizedBox(width: 18),
+
               Expanded(
                 child: Obx(
                   () => PaymentField(

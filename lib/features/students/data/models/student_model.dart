@@ -13,6 +13,7 @@ class StudentModel {
   final String? dateOfBirth;
   final String? gender;
   final String? address;
+  final String? photoPath;
 
   // ---------------------------------------------------------------------------
   // Guardian information
@@ -76,6 +77,7 @@ class StudentModel {
     this.dateOfBirth,
     this.gender,
     this.address,
+    this.photoPath,
 
     // Guardian
     this.guardianName,
@@ -127,6 +129,7 @@ class StudentModel {
     String? dateOfBirth,
     String? gender,
     String? address,
+    String? photoPath,
 
     // Guardian
     String? guardianName,
@@ -175,6 +178,7 @@ class StudentModel {
       dateOfBirth: dateOfBirth ?? this.dateOfBirth,
       gender: gender ?? this.gender,
       address: address ?? this.address,
+      photoPath: photoPath ?? this.photoPath,
 
       // Guardian
       guardianName: guardianName ?? this.guardianName,
@@ -231,6 +235,7 @@ class StudentModel {
       'date_of_birth': dateOfBirth,
       'gender': gender,
       'address': address,
+      'photo_path': photoPath,
 
       // Guardian
       'guardian_name': guardianName,
@@ -281,6 +286,7 @@ class StudentModel {
       dateOfBirth: map['date_of_birth'] as String?,
       gender: map['gender'] as String?,
       address: map['address'] as String?,
+      photoPath: map['photo_path'] as String?,
 
       // Guardian
       guardianName: map['guardian_name'] as String?,
@@ -332,9 +338,42 @@ class StudentModel {
 // Never let either side define its own separate list again.
 // =============================================================================
 
-const List<String> kStudentDepartments = ['Nursing', 'Medical', 'Pharmacy'];
+// Corrected directly from ONIMS's own admissions poster (the client's
+// source of truth — the earlier onims.edu.pk/admissions-page version
+// was missing the whole 2-year diploma tier and grouped departments
+// wrong). Per the client: DPT, BS-MLT, LHV, CMW and every 2-year
+// diploma program all sit under one "Allied Health Sciences"
+// department; Nursing, Pharmacy and Computing stay separate.
+const List<String> kStudentDepartments = [
+  'Allied Health Sciences',
+  'Nursing & Midwifery',
+  'Pharmacy',
+  'Computing',
+];
 
-const List<String> kStudentPrograms = ['BS Nursing', 'BS', 'DPT'];
+const List<String> kStudentPrograms = [
+  // Degree programs
+  'DPT (Doctor of Physiotherapy)',
+  'Pharm-D (Doctor of Pharmacy)',
+  'BS-MLT',
+  'BSN (Nursing)',
+  'Post-RN',
+  'BSCS',
+  'BSIT',
+
+  // 2-year diploma, after Matric — females only
+  'LHV (Lady Health Visitor)',
+  'CMW (Community Midwifery)',
+
+  // 2-year diploma, after Matric (F.Sc equivalent)
+  'Operation Theater Technology',
+  'Radiography & Imaging Technology',
+  'Medical Lab Technology (Diploma)',
+  'Dispensing Technology',
+  'Anesthesia Technician',
+  'Pharmacy Technician',
+  'Physiotherapy Technology',
+];
 
 const List<String> kStudentSemesters = [
   '1st',

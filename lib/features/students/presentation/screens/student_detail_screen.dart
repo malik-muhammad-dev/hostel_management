@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
@@ -119,25 +121,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
             ),
             child: Row(
               children: [
-                Container(
-                  width: 88,
-                  height: 88,
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    student.name.isNotEmpty
-                        ? student.name.substring(0, 1).toUpperCase()
-                        : '?',
-                    style: const TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
+                _ProfilePhoto(student: student),
 
                 const SizedBox(width: 20),
 
@@ -321,6 +305,59 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
         snackPosition: SnackPosition.BOTTOM,
       );
     }
+  }
+}
+
+// =============================================================================
+// Profile photo — shows the student's uploaded photo when one exists,
+// falling back to the initial-letter avatar (the original look, and
+// still what every student without a photo gets, plus the safe fallback
+// if the stored file no longer exists on disk).
+// =============================================================================
+
+class _ProfilePhoto extends StatelessWidget {
+  final StudentModel student;
+
+  const _ProfilePhoto({required this.student});
+
+  Widget _initialAvatar() {
+    return Container(
+      width: 88,
+      height: 88,
+      decoration: BoxDecoration(
+        color: AppColors.primaryLight,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        student.name.isNotEmpty ? student.name.substring(0, 1).toUpperCase() : '?',
+        style: const TextStyle(
+          fontSize: 30,
+          fontWeight: FontWeight.w700,
+          color: AppColors.primary,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final photoPath = student.photoPath;
+
+    if (photoPath == null || photoPath.trim().isEmpty) {
+      return _initialAvatar();
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: Image.file(
+        File(photoPath),
+        width: 88,
+        height: 88,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => _initialAvatar(),
+      ),
+    );
   }
 }
 

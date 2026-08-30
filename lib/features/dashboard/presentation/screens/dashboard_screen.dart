@@ -108,6 +108,15 @@ class DashboardScreen extends StatelessWidget {
           // Stat cards
           // -----------------------------------------------------------------
           Obx(() {
+            // Every value the cards below need is read here — at the top
+            // level of Obx's own builder — never inside the nested
+            // LayoutBuilder further down. Obx only tracks reactive reads
+            // made synchronously within its own builder call; a value
+            // read inside a nested builder (LayoutBuilder, Builder, etc.)
+            // runs too late for Obx to register it as a dependency, so
+            // the screen silently stops updating for that one value
+            // after the first render — exactly what caused both the
+            // Opening Balance edit and the Expenses figure to go stale.
             final profit = controller.netProfitThisMonth;
             final isProfitable = profit >= 0;
 
@@ -117,6 +126,10 @@ class DashboardScreen extends StatelessWidget {
             final collected = controller.collectedThisMonth;
             final expected = controller.expectedThisMonth;
 
+            final totalActiveStudents = controller.totalActiveStudents;
+            final expensesThisMonth = controller.expensesThisMonth;
+            final totalAmount = controller.totalAmount;
+
             return LayoutBuilder(
               builder: (context, constraints) {
                 final isNarrow = constraints.maxWidth < 900;
@@ -124,7 +137,7 @@ class DashboardScreen extends StatelessWidget {
                 final cards = [
                   DashboardStatCard(
                     title: 'Active Students',
-                    value: '${controller.totalActiveStudents}',
+                    value: '$totalActiveStudents',
                     subtitle: totalWhoOwe == 0
                         ? 'Currently enrolled'
                         : '$paid/$totalWhoOwe paid this month',
@@ -141,7 +154,7 @@ class DashboardScreen extends StatelessWidget {
                   ),
                   DashboardStatCard(
                     title: 'Expenses',
-                    value: _formatAmount(controller.expensesThisMonth),
+                    value: _formatAmount(expensesThisMonth),
                     subtitle: 'This month',
                     icon: Icons.receipt_long_rounded,
                     accentColor: AppColors.accentGold,
@@ -158,7 +171,7 @@ class DashboardScreen extends StatelessWidget {
                   ),
                   DashboardStatCard(
                     title: 'Total Amount',
-                    value: _formatAmount(controller.totalAmount),
+                    value: _formatAmount(totalAmount),
                     subtitle:
                         'Opening balance + collected − expenses (all-time)',
                     icon: Icons.account_balance_wallet_rounded,

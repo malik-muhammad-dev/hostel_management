@@ -2,7 +2,9 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:path/path.dart' as p;
 
+import '../../../../core/database/app_database.dart';
 import '../../data/models/student_model.dart';
 import 'student_controller.dart';
 
@@ -163,6 +165,16 @@ final selectedPhoto = Rxn<File>();
 
     addressController.text = student.address ?? '';
 
+    // Photo — populated straight from the already-persisted path so it
+    // shows up as the current photo when editing. If the underlying
+    // file no longer exists on disk (e.g. app data was wiped), the
+    // picker widget's errorBuilder falls back to the empty state rather
+    // than crashing.
+    selectedPhoto.value = (student.photoPath != null &&
+            student.photoPath!.trim().isNotEmpty)
+        ? File(student.photoPath!)
+        : null;
+
     gender.value = student.gender;
 
     hostelStatus.value = student.hostelStatus;
@@ -262,6 +274,12 @@ final selectedPhoto = Rxn<File>();
       address: _nullable(
         addressController.text,
       ),
+
+      // `selectedPhoto` is kept in sync with the path that should be
+      // saved: null (never set / removed), the existing student's path
+      // (untouched on edit), or a freshly copied file's path (just
+      // picked) — see setSelectedPhoto/clearSelectedPhoto below.
+      photoPath: selectedPhoto.value?.path,
 
       // -----------------------------------------------------------------------
       // Guardian
@@ -377,13 +395,38 @@ final selectedPhoto = Rxn<File>();
       ledgerId: existing?.ledgerId,
     );
   }
- void setSelectedPhoto(File file) {
-  selectedPhoto.value = file;
-}
+  // ---------------------------------------------------------------------------
+  // Photo picked from gallery/camera comes back pointing at a location we
+  // don't own (a temp/cache path, or the original file on disk) — it can
+  // disappear or be edited later without us knowing. Copy it into our
+  // own persistent `student_photos` folder immediately (same directory
+  // family as the database itself, so it survives `flutter clean` and
+  // rebuilds) and only then point `selectedPhoto` at the copy. That copy's
+  // path is what actually gets saved on the student, via buildStudentModel.
+  // ---------------------------------------------------------------------------
 
-void clearSelectedPhoto() {
-  selectedPhoto.value = null;
-}
+  Future<void> setSelectedPhoto(File file) async {
+    try {
+      final photosDir = await AppDatabase.instance.photosDirectory;
+      final ext = p.extension(file.path);
+      final fileName =
+          'student_${DateTime.now().millisecondsSinceEpoch}$ext';
+      final newPath = p.join(photosDir.path, fileName);
+
+      final copied = await file.copy(newPath);
+      selectedPhoto.value = copied;
+    } catch (e) {
+      debugPrint('[DEBUG] setSelectedPhoto failed to persist photo: $e');
+      // Still show the picked file so the user gets visual feedback,
+      // even though this path may not survive past this session if the
+      // copy genuinely failed.
+      selectedPhoto.value = file;
+    }
+  }
+
+  void clearSelectedPhoto() {
+    selectedPhoto.value = null;
+  }
   // ---------------------------------------------------------------------------
   // Validation
   // ---------------------------------------------------------------------------

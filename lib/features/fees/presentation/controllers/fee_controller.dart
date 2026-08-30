@@ -50,6 +50,14 @@ class FeeController extends GetxController {
 
   final amountReceived = 0.0.obs;
 
+  // Backs `selectedDiscount` — kept as its own Rx (mirroring
+  // `amountReceived` above) rather than reading discountController.text
+  // straight from a getter, because a plain (non-Rx) read inside an Obx
+  // does not register as a tracked dependency: the UI would render the
+  // discount once and then silently stop updating as the admin types,
+  // the same class of bug already found and fixed on the dashboard.
+  final discountAmount = 0.0.obs;
+
   final currentMonthFeeController = TextEditingController();
   final previousBalanceController = TextEditingController();
   final fineController = TextEditingController();
@@ -78,6 +86,10 @@ class FeeController extends GetxController {
       _updateAmountReceived,
     );
 
+    discountController.addListener(
+      _updateDiscount,
+    );
+
     loadFeeData();
   }
 
@@ -85,6 +97,10 @@ class FeeController extends GetxController {
   void onClose() {
     amountReceivedController.removeListener(
       _updateAmountReceived,
+    );
+
+    discountController.removeListener(
+      _updateDiscount,
     );
 
     currentMonthFeeController.dispose();
@@ -101,6 +117,17 @@ class FeeController extends GetxController {
   void _updateAmountReceived() {
     amountReceived.value =
         double.tryParse(amountReceivedController.text) ?? 0;
+  }
+
+  // Strips anything that isn't a digit or a decimal point before parsing
+  // — same fix as the dashboard's Opening Balance field, so typing a
+  // comma-formatted discount (e.g. "2,000") doesn't silently parse to 0.
+  void _updateDiscount() {
+    final cleaned = discountController.text.replaceAll(
+      RegExp(r'[^0-9.]'),
+      '',
+    );
+    discountAmount.value = double.tryParse(cleaned) ?? 0;
   }
 
   // ===========================================================================
@@ -627,7 +654,12 @@ return baseFee + serviceAmount;}
   // whatever was typed into an earlier payment for the same month (that
   // was the other half of the same stale-snapshot bug: reopening the
   // form for a second payment used to silently re-show old fine/discount
-  // values as if they applied again).
+  // values as if they applied again). `resetPaymentForm()` below clears
+  // discountController/discountAmount for exactly this reason.
+  //
+  // Fine has no input field yet, so it stays hardcoded at 0. Discount is
+  // wired to a real field (see PaymentAmountSection) and is entirely
+  // optional — left blank, it parses to 0 and changes nothing.
   // ---------------------------------------------------------------------------
 
   double get selectedPreviousBalance {
@@ -643,7 +675,7 @@ return baseFee + serviceAmount;}
 
   double get selectedFine => 0;
 
-  double get selectedDiscount => 0;
+  double get selectedDiscount => discountAmount.value;
 
   double get selectedTotalDue {
     final remainingMonthFee =
@@ -678,12 +710,6 @@ return baseFee + serviceAmount;}
   double get fine =>
       double.tryParse(
         fineController.text,
-      ) ??
-      0;
-
-  double get discount =>
-      double.tryParse(
-        discountController.text,
       ) ??
       0;
 
@@ -999,9 +1025,11 @@ Future<void> setPaymentStudent(int? studentId) async {
     amountReceivedController.clear();
     paymentReferenceController.clear();
     notesController.clear();
+    discountController.clear();
 
     paymentDate.value = '';
     receiptAttachmentPath.value = null;
     amountReceived.value = 0;
+    discountAmount.value = 0;
   }
 }
