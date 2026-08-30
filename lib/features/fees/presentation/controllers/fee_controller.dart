@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../../students/presentation/controllers/student_controller.dart';
 import '../../../students/presentation/controllers/student_service_controller.dart';
 import '../../../students/data/models/student_model.dart';
+import '../../../settings/presentation/controllers/app_settings_controller.dart';
 import '../../data/models/fee_payment_model.dart';
 import '../../data/models/fee_transaction_model.dart';
 import '../../data/models/student_fee_summary_model.dart';
@@ -476,8 +477,35 @@ Future<void> refreshServiceAmountsForStudent(
 
   double get outstanding => totalExpected - collected;
 
-  // TODO: compute overdue from transactions past due date.
-  double get overdue => 0;
+  // Total Late Fine currently owed, summed across the same set of
+  // students/months the two figures above are scoped to. Always
+  // evaluated against the fee-month "as of today" (`_currentFeeMonth()`)
+  // rather than "all months ever" — a fine is a today-relative concept,
+  // not a historical ledger total.
+  double get overdue {
+    final studentController = Get.find<StudentController>();
+    final activeStudents = studentController.activeStudents
+        .where((student) => student.id != null);
+
+    if (showAllMonths.value) {
+      final currentMonth = _currentFeeMonth();
+      return activeStudents.fold<double>(
+        0.0,
+        (sum, student) => sum + totalFineOwed(student.id!, currentMonth),
+      );
+    }
+
+    final month = feeTableMonth.value;
+    if (month.isEmpty) return 0.0;
+
+    // A specific month is selected — match totalExpected/collected's
+    // scoping (that month only, not the cumulative stack) so the three
+    // figures stay comparable side by side.
+    return activeStudents.fold<double>(
+      0.0,
+      (sum, student) => sum + fineForSingleMonth(student.id!, month),
+    );
+  }
 
   // ===========================================================================
   // PAYMENT FORM — SELECTED STUDENT/MONTH
@@ -649,17 +677,18 @@ return baseFee + serviceAmount;}
   }
 
   // ---------------------------------------------------------------------------
-  // Fine / Discount are adjustments entered fresh for THIS payment
-  // submission — they must default to 0 on a clean form, not echo back
-  // whatever was typed into an earlier payment for the same month (that
-  // was the other half of the same stale-snapshot bug: reopening the
-  // form for a second payment used to silently re-show old fine/discount
-  // values as if they applied again). `resetPaymentForm()` below clears
-  // discountController/discountAmount for exactly this reason.
+  // Fine / Discount are adjustments shown fresh for THIS payment — they
+  // must default to 0 on a clean form, not echo back whatever applied to
+  // an earlier payment for the same month (that was the other half of
+  // the same stale-snapshot bug: reopening the form for a second payment
+  // used to silently re-show old fine/discount values as if they applied
+  // again). `resetPaymentForm()` below clears discountController/
+  // discountAmount for exactly this reason.
   //
-  // Fine has no input field yet, so it stays hardcoded at 0. Discount is
-  // wired to a real field (see PaymentAmountSection) and is entirely
-  // optional — left blank, it parses to 0 and changes nothing.
+  // Discount is wired to a real field (see PaymentAmountSection) and is
+  // entirely optional — left blank, it parses to 0 and changes nothing.
+  // Fine is NOT admin-entered at all — see `selectedFine` / the "LATE
+  // FINE" section below for why it's computed automatically instead.
   // ---------------------------------------------------------------------------
 
   double get selectedPreviousBalance {
@@ -673,7 +702,127 @@ return baseFee + serviceAmount;}
     return unpaidBalanceBeforeMonth(studentId, feeMonth);
   }
 
-  double get selectedFine => 0;
+  // ===========================================================================
+  // LATE FINE
+  //
+  // The client's rule: once a month's fine due day (Settings, default
+  // the 9th) has passed and that month is still unpaid, a fine (Settings,
+  // default Rs. 100) applies — automatically, without the admin having
+  // to remember to add it. This exists precisely because the admin
+  // forgetting was the original problem being solved.
+  //
+  // Computed live from today's real date every time, the same
+  // self-healing approach as Previous Balance / Total Amount elsewhere
+  // in this app: pay a month off, or change the fine amount/due day in
+  // Settings, and every screen immediately reflects the new reality —
+  // there is no stored "fine" row to fall out of sync and nothing to
+  // manually clear.
+  //
+  // Stacks across every unpaid month whose due day has passed (a student
+  // 3 months behind shows 3x the fine) — mirroring exactly how Previous
+  // Balance already rolls forward unpaid months. Only counts months
+  // on/after `fineEffectiveFrom` (stamped once, to the month this
+  // feature was installed) so switching it on never back-fines a student
+  // for months that came and went before the rule existed.
+  // ===========================================================================
+
+  DateTime? _parseFeeMonth(String feeMonth) {
+    final parts = feeMonth.split('-');
+    if (parts.length != 2) return null;
+
+    final year = int.tryParse(parts[0]);
+    final month = int.tryParse(parts[1]);
+    if (year == null || month == null) return null;
+
+    return DateTime(year, month);
+  }
+
+  /// Fine owed for exactly ONE month — 0 unless that month's fine due
+  /// date has already passed and the month still has a pending balance.
+  ///
+  /// Note: "still has a pending balance" is judged from the month's base
+  /// fee vs. what's been collected for it (the same `feePending` the
+  /// rest of the app already uses) — a payment that covers the base fee
+  /// in full is enough to stop that month from being counted as unpaid
+  /// here, even in the rare case the fine portion specifically wasn't
+  /// separately collected. Deliberately not persisting fine into the
+  /// charge transaction itself to get exact tracking of that edge case —
+  /// doing so would change `chargeTransaction.debit`, which Total
+  /// Expected/dashboard totals already rely on being just the base fee.
+  double fineForSingleMonth(int studentId, String feeMonth) {
+    final settings = Get.find<AppSettingsController>();
+
+    final effectiveFrom = settings.fineEffectiveFrom.value;
+    if (effectiveFrom != null &&
+        effectiveFrom.length >= 7 &&
+        feeMonth.compareTo(effectiveFrom.substring(0, 7)) < 0) {
+      return 0;
+    }
+
+    final parsed = _parseFeeMonth(feeMonth);
+    if (parsed == null) return 0;
+
+    final dueDate = DateTime(parsed.year, parsed.month, settings.fineDueDay.value);
+    if (!DateTime.now().isAfter(dueDate)) return 0;
+
+    final summary = computeFeeSummaryForMonth(studentId, feeMonth);
+    if (summary.feePending <= 0) return 0;
+
+    return settings.fineAmount.value;
+  }
+
+  /// Total fine owed by a student across every unpaid month from their
+  /// enrollment (or `fineEffectiveFrom`, whichever is later) up to and
+  /// including [uptoFeeMonth].
+  double totalFineOwed(int studentId, String uptoFeeMonth) {
+    final upto = _parseFeeMonth(uptoFeeMonth);
+    if (upto == null) return 0;
+
+    final studentController = Get.find<StudentController>();
+    final student = studentController.students
+        .firstWhereOrNull((student) => student.id == studentId);
+    if (student == null) return 0;
+
+    DateTime cursor = upto;
+
+    final enrollmentDate = student.packageStartDate ?? student.admissionDate;
+    if (enrollmentDate != null && enrollmentDate.length >= 7) {
+      final enrollYear = int.tryParse(enrollmentDate.substring(0, 4));
+      final enrollMonth = int.tryParse(enrollmentDate.substring(5, 7));
+      if (enrollYear != null && enrollMonth != null) {
+        cursor = DateTime(enrollYear, enrollMonth);
+      }
+    }
+
+    double total = 0;
+
+    // Safety cap — 120 months (10 years) is far more than any real
+    // enrollment span, and stops a malformed date from ever spinning
+    // this into an unbounded loop.
+    var guard = 0;
+
+    while (!cursor.isAfter(upto) && guard < 120) {
+      total += fineForSingleMonth(
+        studentId,
+        _formatFeeMonth(cursor.year, cursor.month),
+      );
+      cursor = DateTime(cursor.year, cursor.month + 1);
+      guard++;
+    }
+
+    return total;
+  }
+
+  double get selectedFine {
+    final studentId = selectedStudentId.value;
+    final feeMonth = selectedFeeMonth.value;
+
+    if (studentId == null || feeMonth.isEmpty) {
+      return 0;
+    }
+
+    return totalFineOwed(studentId, feeMonth);
+  }
 
   double get selectedDiscount => discountAmount.value;
 

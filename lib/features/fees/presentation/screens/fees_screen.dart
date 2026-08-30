@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../settings/presentation/controllers/app_settings_controller.dart';
 import '../../../students/presentation/controllers/student_controller.dart';
 
 import '../controllers/fee_controller.dart';
@@ -189,13 +190,14 @@ class FeesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final feeController = Get.find<FeeController>();
     final studentController = Get.find<StudentController>();
+    final settingsController = Get.find<AppSettingsController>();
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(28),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildHeader(),
+          _buildHeader(context, settingsController),
 
           const SizedBox(height: 24),
 
@@ -272,26 +274,219 @@ class FeesScreen extends StatelessWidget {
   // HEADER
   // ===========================================================================
 
-  Widget _buildHeader() {
-    return const Column(
+  Widget _buildHeader(
+    BuildContext context,
+    AppSettingsController settingsController,
+  ) {
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Fees & Payments',
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Fees & Payments',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              SizedBox(height: 6),
+              Text(
+                'Manage student fees, payments, outstanding balances and dues',
+                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+              ),
+            ],
           ),
         ),
-        SizedBox(height: 6),
-        Text(
-          'Manage student fees, payments, outstanding balances and dues',
-          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-        ),
+        _buildFineRuleChip(context, settingsController),
       ],
     );
   }
+
+  // ===========================================================================
+  // LATE FINE RULE
+  //
+  // A small, always-visible control so the admin never has to hunt for
+  // this — it directly answers "what happens if a student doesn't pay by
+  // the Nth". Tapping it opens a dialog to change the amount/day; the
+  // change applies immediately everywhere (Fees table, Record Payment,
+  // Dashboard's Overdue figure) since it's read live from Settings.
+  // ===========================================================================
+
+  Widget _buildFineRuleChip(
+    BuildContext context,
+    AppSettingsController settingsController,
+  ) {
+    return Obx(
+      () => InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => _showEditFineRuleDialog(context, settingsController),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.report_gmailerrorred_outlined,
+                size: 16,
+                color: AppColors.error,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Late Fine: Rs. ${settingsController.fineAmount.value.toStringAsFixed(0)} '
+                'after the ${_ordinal(settingsController.fineDueDay.value)}',
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Icon(
+                Icons.edit_outlined,
+                size: 14,
+                color: AppColors.textSecondary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _ordinal(int day) {
+    if (day % 10 == 1 && day != 11) return '${day}st';
+    if (day % 10 == 2 && day != 12) return '${day}nd';
+    if (day % 10 == 3 && day != 13) return '${day}rd';
+    return '${day}th';
+  }
+
+  Future<void> _showEditFineRuleDialog(
+    BuildContext context,
+    AppSettingsController settingsController,
+  ) async {
+    final amountController = TextEditingController(
+      text: settingsController.fineAmount.value.toStringAsFixed(0),
+    );
+    final dayController = TextEditingController(
+      text: settingsController.fineDueDay.value.toString(),
+    );
+
+    final errorText = ''.obs;
+
+    final result = await showDialog<_FineRuleResult>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Late Fine Rule'),
+          content: SizedBox(
+            width: 340,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Applies automatically once a month\'s due day has '
+                  'passed and that month is still unpaid.',
+                  style: TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 18),
+                TextField(
+                  controller: amountController,
+                  autofocus: true,
+                  keyboardType: const TextInputType.numberWithOptions(),
+                  decoration: const InputDecoration(
+                    labelText: 'Fine amount',
+                    prefixText: 'Rs. ',
+                    hintText: 'e.g. 100',
+                  ),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: dayController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Due day of the month',
+                    hintText: '1-28',
+                  ),
+                ),
+                Obx(
+                  () => errorText.value.isEmpty
+                      ? const SizedBox(height: 8)
+                      : Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            errorText.value,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.error,
+                            ),
+                          ),
+                        ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final cleanedAmount = amountController.text
+                    .replaceAll(RegExp(r'[^0-9.]'), '')
+                    .trim();
+                final amount = double.tryParse(cleanedAmount);
+
+                final day = int.tryParse(dayController.text.trim());
+
+                if (cleanedAmount.isEmpty || amount == null || amount < 0) {
+                  errorText.value = 'Enter a valid fine amount';
+                  return;
+                }
+
+                // Restricted to 1-28 so it's always a valid day in every
+                // month, including February — no month-end edge cases
+                // to reason about anywhere this is used.
+                if (day == null || day < 1 || day > 28) {
+                  errorText.value = 'Due day must be between 1 and 28';
+                  return;
+                }
+
+                Navigator.of(context).pop(
+                  _FineRuleResult(amount: amount, dueDay: day),
+                );
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (result != null) {
+      await settingsController.setFineRule(
+        amount: result.amount,
+        dueDay: result.dueDay,
+      );
+    }
+  }
+}
+
+class _FineRuleResult {
+  final double amount;
+  final int dueDay;
+
+  const _FineRuleResult({required this.amount, required this.dueDay});
 }
 
 // =============================================================================

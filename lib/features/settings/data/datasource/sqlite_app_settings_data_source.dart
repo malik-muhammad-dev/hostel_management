@@ -35,4 +35,97 @@ class SqliteAppSettingsDataSource implements AppSettingsDataSource {
       whereArgs: [1],
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Late Fine rule
+  // ---------------------------------------------------------------------------
+
+  Future<Map<String, Object?>> _row() async {
+    final db = await _db;
+
+    final rows = await db.query(
+      'app_settings',
+      where: 'id = ?',
+      whereArgs: [1],
+      limit: 1,
+    );
+
+    return rows.isEmpty ? const {} : rows.first;
+  }
+
+  @override
+  Future<double> getFineAmount() async {
+    final row = await _row();
+    return (row['fine_amount'] as num?)?.toDouble() ?? 100.0;
+  }
+
+  @override
+  Future<int> getFineDueDay() async {
+    final row = await _row();
+    return (row['fine_due_day'] as num?)?.toInt() ?? 9;
+  }
+
+  @override
+  Future<String?> getFineEffectiveFrom() async {
+    final row = await _row();
+    return row['fine_effective_from'] as String?;
+  }
+
+  @override
+  Future<void> setFineRule({
+    required double amount,
+    required int dueDay,
+  }) async {
+    final db = await _db;
+
+    await db.update(
+      'app_settings',
+      {
+        'fine_amount': amount,
+        'fine_due_day': dueDay,
+      },
+      where: 'id = ?',
+      whereArgs: [1],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Backup
+  // ---------------------------------------------------------------------------
+
+  @override
+  Future<String?> getBackupFolderPath() async {
+    final row = await _row();
+    return row['backup_folder_path'] as String?;
+  }
+
+  @override
+  Future<void> setBackupFolderPath(String? path) async {
+    final db = await _db;
+
+    await db.update(
+      'app_settings',
+      {'backup_folder_path': path},
+      where: 'id = ?',
+      whereArgs: [1],
+    );
+  }
+
+  @override
+  Future<String?> getLastBackupAt() async {
+    final row = await _row();
+    return row['last_backup_at'] as String?;
+  }
+
+  @override
+  Future<void> setLastBackupAt(String value) async {
+    final db = await _db;
+
+    await db.update(
+      'app_settings',
+      {'last_backup_at': value},
+      where: 'id = ?',
+      whereArgs: [1],
+    );
+  }
 }

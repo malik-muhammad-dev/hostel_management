@@ -9,6 +9,8 @@ import 'package:hostel_management/features/fees/presentation/screens/record_paym
 import 'package:hostel_management/features/reports/presentation/screens/fee_collection_report_screen.dart';
 import 'package:hostel_management/features/reports/presentation/screens/financial_report_screen.dart';
 import 'package:hostel_management/features/reports/presentation/screens/report_screen.dart';
+import 'package:hostel_management/features/settings/presentation/screens/setting_screen.dart';
+
 import 'package:hostel_management/features/students/presentation/screens/add_student_screen.dart';
 import 'package:hostel_management/features/students/presentation/screens/student_detail_screen.dart';
 import 'package:hostel_management/features/students/presentation/screens/student_screen.dart';
@@ -72,7 +74,7 @@ class AppShellController extends GetxController {
     if (authController.isFeeCollector) {
       return const [2];
     }
-    return const [0, 1, 2, 3, 4];
+    return const [0, 1, 2, 3, 4, 5];
   }
 
   // ---------------------------------------------------------------------------
@@ -107,6 +109,8 @@ class AppShellController extends GetxController {
         return 'Expenses';
       case 4:
         return 'Reports';
+      case 5:
+        return 'Settings';
       default:
         return 'Dashboard';
     }
@@ -142,6 +146,9 @@ class AppShellController extends GetxController {
 
       case 4:
         return const ReportsScreen();
+
+      case 5:
+        return const SettingsScreen();
 
       default:
         return const DashboardScreen();

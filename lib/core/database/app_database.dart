@@ -39,7 +39,7 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._internal();
 
   static const _dbName = 'onims_hostel.db';
-  static const _dbVersion = 6;
+  static const _dbVersion = 8;
 
   Database? _database;
 
@@ -81,6 +81,32 @@ class AppDatabase {
   // so they survive `flutter clean` and rebuilds. Only the resulting path
   // is stored in the `students.photo_path` column.
   // ---------------------------------------------------------------------------
+
+  // ---------------------------------------------------------------------------
+  // Backup — writes a self-contained, point-in-time SNAPSHOT of the live
+  // database to [destinationPath] using SQLite's own `VACUUM INTO`.
+  //
+  // Why this is safe for the live data:
+  // - `VACUUM INTO` only ever READS the source database and WRITES a new
+  //   file at the destination. It cannot modify, delete, or lock the
+  //   source database in any lasting way — the live `students`,
+  //   `fee_payments`, `fee_transactions`, `expenses` tables are never
+  //   touched by this call.
+  // - It runs on the SAME connection every other read/write already goes
+  //   through (`AppDatabase.instance.database`), and sqflite serializes
+  //   operations on a connection — so if a backup happens to run at the
+  //   exact moment the admin is saving a payment, the save simply waits
+  //   its turn in the queue rather than being corrupted or lost. Nothing
+  //   is ever in a "half saved" state.
+  // - `destinationPath` must not already exist — SQLite refuses to
+  //   overwrite via VACUUM INTO. Callers are expected to pass a fresh
+  //   (e.g. timestamped) path each time for exactly this reason.
+  // ---------------------------------------------------------------------------
+
+  Future<void> backupTo(String destinationPath) async {
+    final db = await database;
+    await db.execute('VACUUM INTO ?', [destinationPath]);
+  }
 
   Future<Directory> get photosDirectory async {
     final supportDir = await getApplicationSupportDirectory();
@@ -240,21 +266,53 @@ class AppDatabase {
     );
 
     // -------------------------------------------------------------------------
-    // A single-row settings table — currently just the one overall
-    // "Opening Balance" figure (money already on hand before the hostel
-    // started using this app). `CHECK (id = 1)` keeps it a true singleton;
-    // the row is always inserted here so app code can always assume it
-    // exists and just UPDATE it, never INSERT.
+    // A single-row settings table. `CHECK (id = 1)` keeps it a true
+    // singleton; the row is always inserted here so app code can always
+    // assume it exists and just UPDATE it, never INSERT.
+    //
+    // - opening_balance: money already on hand before the hostel started
+    //   using this app.
+    // - fine_amount / fine_due_day: the Late Fine rule — once a month's
+    //   fine_due_day (day-of-month, 1-28) has passed and that month is
+    //   still unpaid, fine_amount is added automatically. See
+    //   FeeController's "LATE FINE" section for how this is applied.
+    // - fine_effective_from: the fee-month ("YYYY-MM") the fine rule
+    //   starts counting from. Set to the current month the moment this
+    //   row is created/migrated, so turning the feature on never
+    //   retroactively fines a student for months that came and went
+    //   before the rule existed.
+    // - backup_folder_path: a local folder (typically one a cloud-sync
+    //   app like Google Drive/OneDrive is watching) where automatic
+    //   backups + the read-only HTML report get written. NULL = the
+    //   feature is simply off; nothing runs.
+    // - last_backup_at: when the most recent backup completed, shown on
+    //   the Settings screen so the admin can see at a glance it's alive.
     // -------------------------------------------------------------------------
     await db.execute('''
       CREATE TABLE app_settings (
-          id              INTEGER PRIMARY KEY CHECK (id = 1),
-          opening_balance REAL NOT NULL DEFAULT 0
+          id                  INTEGER PRIMARY KEY CHECK (id = 1),
+          opening_balance     REAL NOT NULL DEFAULT 0,
+          fine_amount         REAL NOT NULL DEFAULT 100,
+          fine_due_day        INTEGER NOT NULL DEFAULT 9,
+          fine_effective_from TEXT,
+          backup_folder_path  TEXT,
+          last_backup_at      TEXT
       )
     ''');
     await db.execute(
-      'INSERT INTO app_settings (id, opening_balance) VALUES (1, 0)',
+      'INSERT INTO app_settings '
+      '(id, opening_balance, fine_amount, fine_due_day, fine_effective_from, backup_folder_path, last_backup_at) '
+      'VALUES (1, 0, 100, 9, ?, NULL, NULL)',
+      [_currentFeeMonthString()],
     );
+  }
+
+  /// "YYYY-MM" for the current real-world month — used only to stamp a
+  /// sensible default for `fine_effective_from` on a brand-new install.
+  String _currentFeeMonthString() {
+    final now = DateTime.now();
+    return '${now.year.toString().padLeft(4, '0')}-'
+        '${now.month.toString().padLeft(2, '0')}';
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -343,6 +401,44 @@ class AppDatabase {
       // with a photo attached.
       await db.execute(
         'ALTER TABLE students ADD COLUMN photo_path TEXT',
+      );
+    }
+
+    if (oldVersion < 7) {
+      // Late Fine rule — see the app_settings CREATE TABLE comment in
+      // _onCreate for what each column means. fine_effective_from is set
+      // to the CURRENT month at the moment of this migration (not
+      // hardcoded), so an existing install updating to this version
+      // starts the fine rule from today forward — it never reaches back
+      // and fines a student for older unpaid months that predate this
+      // feature existing at all.
+      await db.execute(
+        "ALTER TABLE app_settings ADD COLUMN fine_amount REAL NOT NULL DEFAULT 100",
+      );
+      await db.execute(
+        "ALTER TABLE app_settings ADD COLUMN fine_due_day INTEGER NOT NULL DEFAULT 9",
+      );
+      await db.execute(
+        "ALTER TABLE app_settings ADD COLUMN fine_effective_from TEXT",
+      );
+      await db.execute(
+        'UPDATE app_settings SET fine_effective_from = ? WHERE id = 1',
+        [_currentFeeMonthString()],
+      );
+    }
+
+    if (oldVersion < 8) {
+      // Backup — see the app_settings CREATE TABLE comment in _onCreate.
+      // Both columns default to NULL, which is exactly "feature is off"
+      // — an existing install upgrading to this version does nothing
+      // differently until the admin explicitly picks a backup folder
+      // from the Settings screen. Purely additive: no existing column,
+      // table, or row is touched by this migration.
+      await db.execute(
+        'ALTER TABLE app_settings ADD COLUMN backup_folder_path TEXT',
+      );
+      await db.execute(
+        'ALTER TABLE app_settings ADD COLUMN last_backup_at TEXT',
       );
     }
   }
