@@ -138,6 +138,13 @@ final selectedPhoto = Rxn<File>();
   void _initializeNewStudent() {
     monthlyFeeController.text = '13000';
     netMonthlyFeeController.text = '13000';
+
+    // A brand-new student is active by default in both senses (student
+    // status and hostel occupancy) — nearly every real add is exactly
+    // this case, so defaulting it saves picking the same option on
+    // every single new student. Still fully changeable before saving.
+    studentStatus.value = 'Active';
+    hostelStatus.value = 'Active';
   }
 
   // ---------------------------------------------------------------------------

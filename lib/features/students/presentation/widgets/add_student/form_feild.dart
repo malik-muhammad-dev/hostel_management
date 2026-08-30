@@ -103,6 +103,17 @@ class FormDropdownWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A student saved under an older set of options (e.g. a department
+    // that has since been renamed or removed from the list) would
+    // otherwise crash this dropdown outright — Flutter requires `value`
+    // to exactly match one of `items`, or be null. Rather than lose
+    // that already-recorded value or crash the Edit screen, keep it
+    // selectable (shown as-is) even though it's no longer one of the
+    // "official" choices; picking anything else replaces it normally.
+    final effectiveOptions = (value != null && !options.contains(value))
+        ? [value!, ...options]
+        : options;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -129,7 +140,7 @@ class FormDropdownWidget extends StatelessWidget {
 
         DropdownButtonFormField<String>(
           initialValue: value,
-          items: options
+          items: effectiveOptions
               .map(
                 (option) => DropdownMenuItem<String>(
                   value: option,
