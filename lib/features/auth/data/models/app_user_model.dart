@@ -1,7 +1,7 @@
 enum UserRole { admin, feeCollector }
 
 class AppUser {
-  final int? id;
+  final String? id;
   final String username;
   final String passwordHash;
   final UserRole role;
@@ -24,7 +24,7 @@ class AppUser {
 
   factory AppUser.fromMap(Map<String, Object?> map) {
     return AppUser(
-      id: map['id'] as int?,
+      id: map['id'] as String?,
       username: map['username'] as String,
       passwordHash: map['password_hash'] as String,
       role: UserRole.values.byName(map['role'] as String),

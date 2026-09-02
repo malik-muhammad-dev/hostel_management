@@ -41,7 +41,7 @@ class MockExpenseDataSource implements ExpenseDataSource {
 
   @override
   Future<void> deleteExpense(
-    int expenseId,
+    String expenseId,
   ) async {
     _expenses.removeWhere(
       (expense) => expense.id == expenseId,

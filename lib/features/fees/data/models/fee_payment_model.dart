@@ -1,8 +1,8 @@
 enum PaymentMethod { cash, bankTransfer, onlinePayment, cheque }
 
 class FeePayment {
-  final int? id;
-  final int studentId;
+  final String? id;
+  final String studentId;
   final String feeMonth;
   final double currentMonthFee;
   final double previousBalance;
@@ -59,8 +59,8 @@ class FeePayment {
 
   factory FeePayment.fromMap(Map<String, Object?> map) {
     return FeePayment(
-      id: map['id'] as int?,
-      studentId: map['student_id'] as int,
+      id: map['id'] as String?,
+      studentId: map['student_id'] as String,
       feeMonth: map['fee_month'] as String,
       currentMonthFee: (map['current_month_fee'] as num).toDouble(),
       previousBalance: (map['previous_balance'] as num).toDouble(),

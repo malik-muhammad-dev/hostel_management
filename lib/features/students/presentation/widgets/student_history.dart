@@ -7,7 +7,7 @@ import '../../../fees/presentation/controllers/fee_controller.dart';
 import '../controllers/student_controller.dart';
 
 class StudentHistory extends StatelessWidget {
-  final int studentId;
+  final String studentId;
 
   const StudentHistory({
     super.key,

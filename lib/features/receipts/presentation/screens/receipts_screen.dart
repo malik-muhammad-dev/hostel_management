@@ -293,7 +293,7 @@ class _ReceiptsTable extends StatelessWidget {
     );
   }
 
-  Future<void> _deleteReceipt(int? receiptId) async {
+  Future<void> _deleteReceipt(String? receiptId) async {
     if (receiptId == null) {
       return;
     }

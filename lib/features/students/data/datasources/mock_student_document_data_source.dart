@@ -7,7 +7,7 @@ class MockStudentDocumentDataSource implements StudentDocumentDataSource {
 
   @override
   Future<List<StudentDocumentModel>> getDocumentsForStudent(
-    int studentId,
+    String studentId,
   ) async {
     return _documents
         .where((document) => document.studentId == studentId)
@@ -27,7 +27,7 @@ class MockStudentDocumentDataSource implements StudentDocumentDataSource {
   }
 
   @override
-  Future<void> deleteDocument(int documentId) async {
+  Future<void> deleteDocument(String documentId) async {
     _documents.removeWhere((item) => item.id == documentId);
   }
 }

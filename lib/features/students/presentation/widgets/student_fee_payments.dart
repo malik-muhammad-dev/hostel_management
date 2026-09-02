@@ -10,7 +10,7 @@ import '../../../fees/presentation/widgets/receipt_dialog.dart';
 import '../../data/models/student_model.dart';
 
 class StudentFeePayments extends StatelessWidget {
-  final int studentId;
+  final String studentId;
 
   const StudentFeePayments({
     super.key,
@@ -328,7 +328,7 @@ class _PaymentStatusBadge extends StatelessWidget {
 
 class _PaymentHistoryCard extends StatelessWidget {
   final List<FeePayment> payments;
-  final int studentId;
+  final String studentId;
   final StudentModel student;
 
   const _PaymentHistoryCard({

@@ -38,7 +38,7 @@ class SqliteExpenseDataSource implements ExpenseDataSource {
   }
 
   @override
-  Future<void> deleteExpense(int expenseId) async {
+  Future<void> deleteExpense(String expenseId) async {
     final db = await _db;
     await db.delete('expenses', where: 'id = ?', whereArgs: [expenseId]);
   }

@@ -8,8 +8,8 @@ class MockStudentServiceDataSource implements StudentServiceDataSource {
     // Default Transport service for Ayesha
     // -----------------------------------------------------------------------
     const StudentServiceModel(
-      id: 1,
-      studentId: 1,
+      id: 'mock-service-1',
+      studentId: 'mock-student-1',
       name: 'Transport',
       description: 'College shuttle / hostel transport',
       monthlyAmount: 2000,
@@ -19,7 +19,7 @@ class MockStudentServiceDataSource implements StudentServiceDataSource {
 
   @override
   Future<List<StudentServiceModel>> getServicesForStudent(
-    int studentId,
+    String studentId,
   ) async {
     return List.unmodifiable(
       _services.where((service) => service.studentId == studentId),
@@ -45,7 +45,7 @@ class MockStudentServiceDataSource implements StudentServiceDataSource {
   }
 
   @override
-  Future<void> deleteService(int serviceId) async {
+  Future<void> deleteService(String serviceId) async {
     _services.removeWhere(
       (service) => service.id == serviceId,
     );

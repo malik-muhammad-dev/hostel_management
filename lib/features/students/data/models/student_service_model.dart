@@ -1,6 +1,6 @@
 class StudentServiceModel {
-  final int? id;
-  final int studentId;
+  final String? id;
+  final String studentId;
 
   final String name;
   final String? description;
@@ -19,8 +19,8 @@ class StudentServiceModel {
   });
 
   StudentServiceModel copyWith({
-    int? id,
-    int? studentId,
+    String? id,
+    String? studentId,
     String? name,
     String? description,
     double? monthlyAmount,
@@ -53,8 +53,8 @@ class StudentServiceModel {
 
   factory StudentServiceModel.fromMap(Map<String, Object?> map) {
     return StudentServiceModel(
-      id: map['id'] as int?,
-      studentId: map['student_id'] as int,
+      id: map['id'] as String?,
+      studentId: map['student_id'] as String,
       name: map['name'] as String,
       description: map['description'] as String?,
       monthlyAmount: (map['monthly_amount'] as num).toDouble(),

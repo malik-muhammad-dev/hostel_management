@@ -228,7 +228,7 @@ class FeeCollectionTable extends StatelessWidget {
   }
 
   StudentFeeSummary? _summaryFor(
-    int studentId,
+    String studentId,
   ) {
     for (final summary in summaries) {
       if (summary.studentId == studentId) {

@@ -394,7 +394,7 @@ class _StudentPicker extends StatelessWidget {
         const SizedBox(height: 7),
         LayoutBuilder(
           builder: (context, constraints) {
-            return DropdownMenu<int>(
+            return DropdownMenu<String>(
               width: constraints.maxWidth,
               initialSelection: controller.selectedStudentId.value,
               enableFilter: true,
@@ -415,7 +415,7 @@ class _StudentPicker extends StatelessWidget {
                 ),
               ),
               dropdownMenuEntries: students.map((student) {
-                return DropdownMenuEntry<int>(
+                return DropdownMenuEntry<String>(
                   value: student.id!,
                   label: '${student.name} (${student.rollNumber ?? '-'})',
                 );

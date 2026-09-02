@@ -9,7 +9,7 @@ class SqliteStudentServiceDataSource implements StudentServiceDataSource {
 
   @override
   Future<List<StudentServiceModel>> getServicesForStudent(
-    int studentId,
+    String studentId,
   ) async {
     final db = await _db;
     final rows = await db.query(
@@ -45,7 +45,7 @@ class SqliteStudentServiceDataSource implements StudentServiceDataSource {
   }
 
   @override
-  Future<void> deleteService(int serviceId) async {
+  Future<void> deleteService(String serviceId) async {
     final db = await _db;
     await db.delete(
       'student_services',

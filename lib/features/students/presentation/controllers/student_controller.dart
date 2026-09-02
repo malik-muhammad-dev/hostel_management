@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../data/models/student_model.dart';
@@ -94,23 +95,17 @@ class StudentController extends GetxController {
 
   // ---------------------------------------------------------------------------
   // Add student
+  //
+  // The id is a client-generated UUID (not a locally-computed max+1) so
+  // records created on different PCs never collide once this syncs to
+  // the shared Supabase backend.
   // ---------------------------------------------------------------------------
-  int _nextStudentId() {
-    if (students.isEmpty) {
-      return 1;
-    }
-
-    return students
-            .map((student) => student.id ?? 0)
-            .reduce((a, b) => a > b ? a : b) +
-        1;
-  }
 
   Future<StudentModel?> addStudent(StudentModel student) async {
     try {
       isLoading.value = true;
 
-      final studentWithId = student.copyWith(id: _nextStudentId());
+      final studentWithId = student.copyWith(id: const Uuid().v4());
 
       await repository.addStudent(studentWithId);
 
@@ -171,7 +166,7 @@ class StudentController extends GetxController {
   // records intact for future reference/audit.
   // ---------------------------------------------------------------------------
 
-  Future<bool> archiveStudent(int id) async {
+  Future<bool> archiveStudent(String id) async {
     try {
       isLoading.value = true;
 

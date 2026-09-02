@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 import 'package:hostel_management/features/students/data/models/student_document%20model.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../data/repositories/student_document_repository.dart';
 
@@ -33,13 +34,13 @@ class StudentDocumentController extends GetxController {
 
   final isLoading = false.obs;
 
-  final selectedStudentId = Rxn<int>();
+  final selectedStudentId = Rxn<String>();
 
   // ---------------------------------------------------------------------------
   // Load documents for an existing student
   // ---------------------------------------------------------------------------
 
-  Future<void> loadDocuments(int studentId) async {
+  Future<void> loadDocuments(String studentId) async {
     try {
       isLoading.value = true;
 
@@ -64,11 +65,12 @@ class StudentDocumentController extends GetxController {
   // `id` is intentionally left null here. Drafts are only ever matched
   // by `title` (never by id — see removeDraftDocumentByTitle,
   // draftDocumentByTitle), so there's no need to invent one before this
-  // document is actually persisted. Once saved, SQLite's own
-  // AUTOINCREMENT assigns the real id — trying to guess it client-side
-  // (as this used to do) caused a genuine UNIQUE constraint collision,
-  // since scanning only the currently-loaded documents/drafts never
-  // reflects the true max id across the whole student_documents table.
+  // document is actually persisted. The real id (a client-generated
+  // UUID — the `id` column has no AUTOINCREMENT to fall back on) is
+  // assigned in saveDraftDocuments/setDocument right before the row is
+  // actually inserted. `studentId` is likewise a placeholder here (the
+  // new student doesn't have a real id yet) and gets overwritten with
+  // the real one in saveDraftDocuments.
   // ---------------------------------------------------------------------------
 
   bool setDraftDocument({
@@ -83,7 +85,7 @@ class StudentDocumentController extends GetxController {
     }
 
     final document = StudentDocumentModel(
-      studentId: 0,
+      studentId: '',
       title: title.trim(),
       fileName: fileName.trim(),
       filePath: filePath,
@@ -118,8 +120,8 @@ class StudentDocumentController extends GetxController {
   // Save draft documents after a NEW student gets an ID
   // ---------------------------------------------------------------------------
 
-  Future<bool> saveDraftDocuments(int studentId) async {
-    if (studentId <= 0) {
+  Future<bool> saveDraftDocuments(String studentId) async {
+    if (studentId.trim().isEmpty) {
       return false;
     }
 
@@ -127,7 +129,10 @@ class StudentDocumentController extends GetxController {
       isLoading.value = true;
 
       for (final document in draftDocuments) {
-        final savedDocument = document.copyWith(studentId: studentId);
+        final savedDocument = document.copyWith(
+          id: const Uuid().v4(),
+          studentId: studentId,
+        );
         await repository.addDocument(savedDocument);
       }
 
@@ -151,13 +156,13 @@ class StudentDocumentController extends GetxController {
   // ---------------------------------------------------------------------------
 
   Future<bool> setDocument({
-    required int studentId,
+    required String studentId,
     required String title,
     required String fileName,
     String? filePath,
     bool isRequired = false,
   }) async {
-    if (studentId <= 0) return false;
+    if (studentId.trim().isEmpty) return false;
     if (title.trim().isEmpty || fileName.trim().isEmpty) return false;
 
     try {
@@ -177,11 +182,13 @@ class StudentDocumentController extends GetxController {
         final index = documents.indexWhere((item) => item.id == updated.id);
         if (index != -1) documents[index] = updated;
       } else {
-        // `id` left null — SQLite assigns the real one on insert. Reload
-        // from the database afterward rather than constructing a local
-        // copy, so `documents` always holds the actual persisted id
-        // (needed for later update/delete calls to target the right row).
+        // `id` is a freshly generated UUID — the `id` column has no
+        // AUTOINCREMENT to assign one on insert. Reload from the
+        // database afterward rather than trusting this local copy, so
+        // `documents` always holds the actual persisted row (needed for
+        // later update/delete calls to target the right row).
         final document = StudentDocumentModel(
+          id: const Uuid().v4(),
           studentId: studentId,
           title: title.trim(),
           fileName: fileName.trim(),
@@ -205,7 +212,7 @@ class StudentDocumentController extends GetxController {
   // Remove an existing document
   // ---------------------------------------------------------------------------
 
-  Future<bool> deleteDocument(int documentId) async {
+  Future<bool> deleteDocument(String documentId) async {
     try {
       isLoading.value = true;
 

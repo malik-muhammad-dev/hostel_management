@@ -9,8 +9,8 @@ class MockFeeDataSource implements FeeDataSource {
     // Student 1 - Ayesha
     // -------------------------------------------------------------------------
     const FeeTransaction(
-      id: 1,
-      studentId: 1,
+      id: 'mock-txn-1',
+      studentId: 'mock-student-1',
       date: '2026-08-01',
       feeMonth: 'August 2026',
       description: 'Monthly Hostel Fee',
@@ -21,8 +21,8 @@ class MockFeeDataSource implements FeeDataSource {
     ),
 
     const FeeTransaction(
-      id: 2,
-      studentId: 1,
+      id: 'mock-txn-2',
+      studentId: 'mock-student-1',
       date: '2026-08-05',
       feeMonth: 'August 2026',
       description: 'Fee Payment',
@@ -36,8 +36,8 @@ class MockFeeDataSource implements FeeDataSource {
     // Student 2 - Sara
     // -------------------------------------------------------------------------
     const FeeTransaction(
-      id: 3,
-      studentId: 2,
+      id: 'mock-txn-3',
+      studentId: 'mock-student-2',
       date: '2026-08-01',
       feeMonth: 'August 2026',
       description: 'Monthly Hostel Fee',
@@ -48,8 +48,8 @@ class MockFeeDataSource implements FeeDataSource {
     ),
 
     const FeeTransaction(
-      id: 4,
-      studentId: 2,
+      id: 'mock-txn-4',
+      studentId: 'mock-student-2',
       date: '2026-08-08',
       feeMonth: 'August 2026',
       description: 'Fee Payment',
@@ -63,8 +63,8 @@ class MockFeeDataSource implements FeeDataSource {
     // Student 3 - Hamza
     // -------------------------------------------------------------------------
     const FeeTransaction(
-      id: 5,
-      studentId: 3,
+      id: 'mock-txn-5',
+      studentId: 'mock-student-3',
       date: '2026-08-01',
       feeMonth: 'August 2026',
       description: 'Monthly Hostel Fee',
@@ -75,8 +75,8 @@ class MockFeeDataSource implements FeeDataSource {
     ),
 
     const FeeTransaction(
-      id: 6,
-      studentId: 3,
+      id: 'mock-txn-6',
+      studentId: 'mock-student-3',
       date: '2026-08-10',
       feeMonth: 'August 2026',
       description: 'Fee Payment',
@@ -90,8 +90,8 @@ class MockFeeDataSource implements FeeDataSource {
     // Student 4 - Ali
     // -------------------------------------------------------------------------
     const FeeTransaction(
-      id: 7,
-      studentId: 4,
+      id: 'mock-txn-7',
+      studentId: 'mock-student-4',
       date: '2026-08-01',
       feeMonth: 'August 2026',
       description: 'Monthly Hostel Fee',
@@ -102,8 +102,8 @@ class MockFeeDataSource implements FeeDataSource {
     ),
 
     const FeeTransaction(
-      id: 8,
-      studentId: 4,
+      id: 'mock-txn-8',
+      studentId: 'mock-student-4',
       date: '2026-08-12',
       feeMonth: 'August 2026',
       description: 'Fee Payment',
@@ -119,8 +119,8 @@ class MockFeeDataSource implements FeeDataSource {
     // Student 1 - Ayesha
     // -------------------------------------------------------------------------
     const FeePayment(
-      id: 1,
-      studentId: 1,
+      id: 'mock-payment-1',
+      studentId: 'mock-student-1',
       feeMonth: 'August 2026',
       currentMonthFee: 15000,
       previousBalance: 0,
@@ -137,8 +137,8 @@ class MockFeeDataSource implements FeeDataSource {
     // Student 2 - Sara
     // -------------------------------------------------------------------------
     const FeePayment(
-      id: 2,
-      studentId: 2,
+      id: 'mock-payment-2',
+      studentId: 'mock-student-2',
       feeMonth: 'August 2026',
       currentMonthFee: 25000,
       previousBalance: 5000,
@@ -155,8 +155,8 @@ class MockFeeDataSource implements FeeDataSource {
     // Student 3 - Hamza
     // -------------------------------------------------------------------------
     const FeePayment(
-      id: 3,
-      studentId: 3,
+      id: 'mock-payment-3',
+      studentId: 'mock-student-3',
       feeMonth: 'August 2026',
       currentMonthFee: 18000,
       previousBalance: 0,
@@ -173,8 +173,8 @@ class MockFeeDataSource implements FeeDataSource {
     // Student 4 - Ali
     // -------------------------------------------------------------------------
     const FeePayment(
-      id: 4,
-      studentId: 4,
+      id: 'mock-payment-4',
+      studentId: 'mock-student-4',
       feeMonth: 'August 2026',
       currentMonthFee: 30000,
       previousBalance: 0,
@@ -193,7 +193,7 @@ class MockFeeDataSource implements FeeDataSource {
     // Student 1 - Ayesha
     // -------------------------------------------------------------------------
     const StudentFeeSummary(
-      studentId: 1,
+      studentId: 'mock-student-1',
       feeCharged: 15000,
       feeSubmitted: 10000,
       feePending: 5000,
@@ -203,7 +203,7 @@ class MockFeeDataSource implements FeeDataSource {
     // Student 2 - Sara
     // -------------------------------------------------------------------------
     const StudentFeeSummary(
-      studentId: 2,
+      studentId: 'mock-student-2',
       feeCharged: 25000,
       feeSubmitted: 15000,
       feePending: 10000,
@@ -213,7 +213,7 @@ class MockFeeDataSource implements FeeDataSource {
     // Student 3 - Hamza
     // -------------------------------------------------------------------------
     const StudentFeeSummary(
-      studentId: 3,
+      studentId: 'mock-student-3',
       feeCharged: 18000,
       feeSubmitted: 8000,
       feePending: 10000,
@@ -223,7 +223,7 @@ class MockFeeDataSource implements FeeDataSource {
     // Student 4 - Ali
     // -------------------------------------------------------------------------
     const StudentFeeSummary(
-      studentId: 4,
+      studentId: 'mock-student-4',
       feeCharged: 30000,
       feeSubmitted: 25000,
       feePending: 5000,
@@ -246,7 +246,7 @@ class MockFeeDataSource implements FeeDataSource {
   }
 
   @override
-  Future<StudentFeeSummary?> getStudentFeeSummary(int studentId) async {
+  Future<StudentFeeSummary?> getStudentFeeSummary(String studentId) async {
     for (final summary in _summaries) {
       if (summary.studentId == studentId) {
         return summary;

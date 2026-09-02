@@ -114,7 +114,7 @@ class FeeCollectionReportController extends GetxController {
   }
 
   StudentFeeSummary? summaryForStudent(
-    int studentId,
+    String studentId,
   ) {
     for (final summary in studentSummaries) {
       if (summary.studentId == studentId) {

@@ -20,7 +20,7 @@ class FeeRepository {
     return dataSource.getStudentFeeSummaries();
   }
 
-  Future<StudentFeeSummary?> getStudentFeeSummary(int studentId) {
+  Future<StudentFeeSummary?> getStudentFeeSummary(String studentId) {
     return dataSource.getStudentFeeSummary(studentId);
   }
 

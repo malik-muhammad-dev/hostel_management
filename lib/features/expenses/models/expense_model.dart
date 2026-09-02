@@ -70,7 +70,7 @@ const List<String> kExpenseCategories = [
 
 @immutable
 class ExpenseModel {
-  final int? id;
+  final String? id;
 
   final DateTime date;
 
@@ -96,7 +96,7 @@ class ExpenseModel {
   // ---------------------------------------------------------------------------
 
   ExpenseModel copyWith({
-    int? id,
+    String? id,
     DateTime? date,
     String? category,
     double? amount,
@@ -140,7 +140,7 @@ class ExpenseModel {
     Map<String, Object?> map,
   ) {
     return ExpenseModel(
-      id: map['id'] as int?,
+      id: map['id'] as String?,
       date: DateTime.parse(
         map['date'] as String,
       ),

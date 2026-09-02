@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../data/repositories/expense_repository.dart';
 import '../../models/expense_model.dart';
@@ -252,7 +253,7 @@ class ExpenseController extends GetxController {
       isSaving.value = true;
 
       final savedExpense = expense.copyWith(
-        id: _nextExpenseId(),
+        id: const Uuid().v4(),
       );
 
       debugPrint(
@@ -323,7 +324,7 @@ class ExpenseController extends GetxController {
   // ===========================================================================
 
   Future<bool> deleteExpense(
-    int expenseId,
+    String expenseId,
   ) async {
     try {
       isLoading.value = true;
@@ -406,25 +407,6 @@ class ExpenseController extends GetxController {
     category.value = null;
 
     paymentMode.value = null;
-  }
-
-  // ===========================================================================
-  // NEXT EXPENSE ID
-  // ===========================================================================
-
-  int _nextExpenseId() {
-    if (expenses.isEmpty) {
-      return 1;
-    }
-
-    return expenses
-            .map(
-              (expense) => expense.id ?? 0,
-            )
-            .reduce(
-              (a, b) => a > b ? a : b,
-            ) +
-        1;
   }
 
   // ===========================================================================

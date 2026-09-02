@@ -1,8 +1,8 @@
 enum FeeTransactionType { charge, payment }
 
 class FeeTransaction {
-  final int? id;
-  final int studentId;
+  final String? id;
+  final String studentId;
   final String date;
   final String feeMonth;
   final String? description;
@@ -43,8 +43,8 @@ class FeeTransaction {
 
   factory FeeTransaction.fromMap(Map<String, Object?> map) {
     return FeeTransaction(
-      id: map['id'] as int?,
-      studentId: map['student_id'] as int,
+      id: map['id'] as String?,
+      studentId: map['student_id'] as String,
       date: map['date'] as String,
       feeMonth: map['fee_month'] as String,
       description: map['description'] as String?,

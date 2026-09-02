@@ -18,7 +18,7 @@ class ReceiptRepository {
     return dataSource.updateReceipt(receipt);
   }
 
-  Future<void> deleteReceipt(int receiptId) {
+  Future<void> deleteReceipt(String receiptId) {
     return dataSource.deleteReceipt(receiptId);
   }
 }

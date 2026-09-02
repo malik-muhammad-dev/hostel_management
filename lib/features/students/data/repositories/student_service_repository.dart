@@ -8,7 +8,7 @@ class StudentServiceRepository {
   StudentServiceRepository(this.dataSource);
 
   Future<List<StudentServiceModel>> getServicesForStudent(
-    int studentId,
+    String studentId,
   ) async {
     return dataSource.getServicesForStudent(studentId);
   }
@@ -21,7 +21,7 @@ class StudentServiceRepository {
     await dataSource.updateService(service);
   }
 
-  Future<void> deleteService(int serviceId) async {
+  Future<void> deleteService(String serviceId) async {
     await dataSource.deleteService(serviceId);
   }
 }

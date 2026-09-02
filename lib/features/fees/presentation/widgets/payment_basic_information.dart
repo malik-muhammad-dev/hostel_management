@@ -13,8 +13,8 @@ class PaymentBasicInformation extends StatelessWidget {
   final ValueChanged<PaymentMethod?> onPaymentMethodChanged;
 
   final List<StudentModel> students;
-  final int? selectedStudentId;
-  final ValueChanged<int?> onStudentChanged;
+  final String? selectedStudentId;
+  final ValueChanged<String?> onStudentChanged;
 
   // `selectedFeeMonth` is always in "YYYY-MM" form (e.g. "2026-08"), the
   // same format the Fees table's month selector uses. Keeping one format
@@ -121,7 +121,7 @@ class PaymentBasicInformation extends StatelessWidget {
         // realistic — typing a few letters of the name/roll number is.
         LayoutBuilder(
           builder: (context, constraints) {
-            return DropdownMenu<int>(
+            return DropdownMenu<String>(
               width: constraints.maxWidth,
               initialSelection: selectedStudentId,
               enableFilter: true,
@@ -146,7 +146,7 @@ class PaymentBasicInformation extends StatelessWidget {
               dropdownMenuEntries: students
                   .where((student) => student.id != null)
                   .map((student) {
-                return DropdownMenuEntry<int>(
+                return DropdownMenuEntry<String>(
                   value: student.id!,
                   label: '${student.name} (${student.rollNumber ?? '-'})',
                 );

@@ -29,7 +29,7 @@ class ExpenseRepository {
   }
 
   Future<void> deleteExpense(
-    int expenseId,
+    String expenseId,
   ) {
     return dataSource.deleteExpense(
       expenseId,

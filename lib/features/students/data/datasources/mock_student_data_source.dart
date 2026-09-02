@@ -4,7 +4,7 @@ import 'student_data_source.dart';
 class MockStudentDataSource implements StudentDataSource {
   final List<StudentModel> _students = [
     const StudentModel(
-      id: 1,
+      id: 'mock-student-1',
 
       // -----------------------------------------------------------------------
       // Personal
@@ -65,7 +65,7 @@ class MockStudentDataSource implements StudentDataSource {
     ),
 
     const StudentModel(
-      id: 2,
+      id: 'mock-student-2',
 
       // -----------------------------------------------------------------------
       // Personal
@@ -126,7 +126,7 @@ class MockStudentDataSource implements StudentDataSource {
     ),
 
     const StudentModel(
-      id: 3,
+      id: 'mock-student-3',
 
       // -----------------------------------------------------------------------
       // Personal
@@ -187,7 +187,7 @@ class MockStudentDataSource implements StudentDataSource {
     ),
 
     const StudentModel(
-      id: 4,
+      id: 'mock-student-4',
 
       // -----------------------------------------------------------------------
       // Personal
@@ -254,7 +254,7 @@ class MockStudentDataSource implements StudentDataSource {
   }
 
   @override
-  Future<StudentModel?> getStudentById(int id) async {
+  Future<StudentModel?> getStudentById(String id) async {
     for (final student in _students) {
       if (student.id == id) {
         return student;
@@ -281,7 +281,7 @@ class MockStudentDataSource implements StudentDataSource {
   }
 
   @override
-  Future<void> deleteStudent(int id) async {
+  Future<void> deleteStudent(String id) async {
     _students.removeWhere((student) => student.id == id);
   }
 }

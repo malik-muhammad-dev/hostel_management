@@ -38,7 +38,7 @@ class SqliteReceiptDataSource implements ReceiptDataSource {
   }
 
   @override
-  Future<void> deleteReceipt(int receiptId) async {
+  Future<void> deleteReceipt(String receiptId) async {
     final db = await _db;
     await db.delete('cash_receipts', where: 'id = ?', whereArgs: [receiptId]);
   }

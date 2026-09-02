@@ -7,7 +7,9 @@ class StudentDocumentRepository {
 
   StudentDocumentRepository(this.dataSource);
 
-  Future<List<StudentDocumentModel>> getDocumentsForStudent(int studentId) {
+  Future<List<StudentDocumentModel>> getDocumentsForStudent(
+    String studentId,
+  ) {
     return dataSource.getDocumentsForStudent(studentId);
   }
 
@@ -19,7 +21,7 @@ class StudentDocumentRepository {
     return dataSource.updateDocument(document);
   }
 
-  Future<void> deleteDocument(int documentId) {
+  Future<void> deleteDocument(String documentId) {
     return dataSource.deleteDocument(documentId);
   }
 }

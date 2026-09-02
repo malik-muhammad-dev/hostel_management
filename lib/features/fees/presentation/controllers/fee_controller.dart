@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../students/presentation/controllers/student_controller.dart';
 import '../../../students/presentation/controllers/student_service_controller.dart';
@@ -29,7 +30,7 @@ class FeeController extends GetxController {
   // Kept for compatibility with existing architecture/data source.
   // The Fees table does NOT use this list.
   final studentFeeSummaries = <StudentFeeSummary>[].obs;
-  final serviceAmountsByStudent = <int, double>{}.obs;
+  final serviceAmountsByStudent = <String, double>{}.obs;
 
   final isLoading = false.obs;
 
@@ -43,7 +44,7 @@ class FeeController extends GetxController {
   // Payment form state
   // ---------------------------------------------------------------------------
 
-  final selectedStudentId = Rxn<int>();
+  final selectedStudentId = Rxn<String>();
   final selectedFeeMonth = ''.obs;
   final selectedPaymentMethod = Rxn<PaymentMethod>();
   final paymentDate = ''.obs;
@@ -255,7 +256,7 @@ await loadStudentServiceAmounts();
   // calculations can depend on the complete transaction history.
   // ===========================================================================
 
-  StudentFeeSummary computeFeeSummary(int studentId) {
+  StudentFeeSummary computeFeeSummary(String studentId) {
     final studentTransactions = transactions.where(
       (transaction) => transaction.studentId == studentId,
     );
@@ -297,7 +298,7 @@ await loadStudentServiceAmounts();
   // ===========================================================================
 
   StudentFeeSummary computeFeeSummaryForMonth(
-  int studentId,
+  String studentId,
   String feeMonth,
 ) {
   final monthTransactions = transactions.where(
@@ -394,12 +395,12 @@ await loadStudentServiceAmounts();
 
   /// Kept for API compatibility.
   Future<StudentFeeSummary?> getStudentFeeSummary(
-    int studentId,
+    String studentId,
   ) async {
     return computeFeeSummary(studentId);
   }
 Future<void> refreshServiceAmountsForStudent(
-  int studentId,
+  String studentId,
 ) async {
   final serviceController =
       Get.find<StudentServiceController>();
@@ -540,7 +541,7 @@ Future<void> refreshServiceAmountsForStudent(
   }
 
   double _chargeForMonth(
-    int studentId,
+    String studentId,
     String feeMonth,
   ) {
     return transactions
@@ -654,7 +655,7 @@ return baseFee + serviceAmount;}
   // its balance exists to carry forward).
   // ---------------------------------------------------------------------------
 
-  double unpaidBalanceBeforeMonth(int studentId, String feeMonth) {
+  double unpaidBalanceBeforeMonth(String studentId, String feeMonth) {
     final priorMonths = transactions
         .where(
           (transaction) =>
@@ -749,7 +750,7 @@ return baseFee + serviceAmount;}
   /// charge transaction itself to get exact tracking of that edge case —
   /// doing so would change `chargeTransaction.debit`, which Total
   /// Expected/dashboard totals already rely on being just the base fee.
-  double fineForSingleMonth(int studentId, String feeMonth) {
+  double fineForSingleMonth(String studentId, String feeMonth) {
     final settings = Get.find<AppSettingsController>();
 
     final effectiveFrom = settings.fineEffectiveFrom.value;
@@ -774,7 +775,7 @@ return baseFee + serviceAmount;}
   /// Total fine owed by a student across every unpaid month from their
   /// enrollment (or `fineEffectiveFrom`, whichever is later) up to and
   /// including [uptoFeeMonth].
-  double totalFineOwed(int studentId, String uptoFeeMonth) {
+  double totalFineOwed(String studentId, String uptoFeeMonth) {
     final upto = _parseFeeMonth(uptoFeeMonth);
     if (upto == null) return 0;
 
@@ -876,7 +877,7 @@ return baseFee + serviceAmount;}
   // ===========================================================================
 
   bool _hasMonthlyCharge(
-    int studentId,
+    String studentId,
     String feeMonth,
   ) {
     return transactions.any(
@@ -887,30 +888,17 @@ return baseFee + serviceAmount;}
     );
   }
 
-  int _nextId(
-    List<dynamic> items,
-    int? Function(dynamic) idOf,
-  ) {
-    if (items.isEmpty) {
-      return 1;
-    }
-
-    final maxId = items
-        .map(
-          (item) => idOf(item) ?? 0,
-        )
-        .reduce(
-          (a, b) => a > b ? a : b,
-        );
-
-    return maxId + 1;
-  }
-
-  Future<bool> submitPayment() async {
+  // Returns the payment record that was just created (with its real,
+  // persisted UUID id already on it — generated below, before saving),
+  // or null if validation failed. The caller no longer needs to guess
+  // which payment was "just created" by searching for the highest id
+  // afterward — that trick relied on ids being sequential integers,
+  // which stopped being true the moment ids became UUIDs.
+  Future<FeePayment?> submitPayment() async {
     final validationMessage = validatePayment();
 
     if (validationMessage != null) {
-      return false;
+      return null;
     }
 
     final studentId = selectedStudentId.value!;
@@ -923,10 +911,7 @@ return baseFee + serviceAmount;}
     // -------------------------------------------------------------------------
 
     final payment = FeePayment(
-      id: _nextId(
-        payments,
-        (payment) => (payment as FeePayment).id,
-      ),
+      id: const Uuid().v4(),
       studentId: studentId,
       feeMonth: feeMonth,
       currentMonthFee: selectedCurrentMonthFee,
@@ -959,11 +944,7 @@ return baseFee + serviceAmount;}
       feeMonth,
     )) {
       chargeTransaction = FeeTransaction(
-        id: _nextId(
-          transactions,
-          (transaction) =>
-              (transaction as FeeTransaction).id,
-        ),
+        id: const Uuid().v4(),
         studentId: studentId,
         date: paymentDate.value,
         feeMonth: feeMonth,
@@ -979,17 +960,8 @@ return baseFee + serviceAmount;}
     // 3. Payment transaction
     // -------------------------------------------------------------------------
 
-    final pendingIds = [
-      ...transactions,
-      ?chargeTransaction,
-    ];
-
     final paymentTransaction = FeeTransaction(
-      id: _nextId(
-        pendingIds,
-        (transaction) =>
-            (transaction as FeeTransaction).id,
-      ),
+      id: const Uuid().v4(),
       studentId: studentId,
       date: paymentDate.value,
       feeMonth: feeMonth,
@@ -1019,7 +991,7 @@ return baseFee + serviceAmount;}
 
     await loadFeeData();
 
-    return true;
+    return payment;
   }
 
   Future<void> addPayment(
@@ -1045,7 +1017,7 @@ Future<void> loadStudentServiceAmounts() async {
 
   final studentIds = studentController.activeStudents
       .map((student) => student.id)
-      .whereType<int>()
+      .whereType<String>()
       .toList();
 
   if (studentIds.isEmpty) {
@@ -1066,7 +1038,7 @@ Future<void> loadStudentServiceAmounts() async {
   );
 
   serviceAmountsByStudent.assignAll(
-    Map<int, double>.fromEntries(results),
+    Map<String, double>.fromEntries(results),
   );
 }
   // ===========================================================================
@@ -1129,7 +1101,7 @@ Future<void> loadStudentServiceAmounts() async {
   // PAYMENT FORM — SETTERS
   // ===========================================================================
 
-Future<void> setPaymentStudent(int? studentId) async {
+Future<void> setPaymentStudent(String? studentId) async {
   selectedStudentId.value = studentId;
 
   if (studentId == null) {

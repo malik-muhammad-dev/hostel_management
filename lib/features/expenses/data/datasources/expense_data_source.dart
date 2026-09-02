@@ -12,6 +12,6 @@ abstract class ExpenseDataSource {
   );
 
   Future<void> deleteExpense(
-    int expenseId,
+    String expenseId,
   );
 }

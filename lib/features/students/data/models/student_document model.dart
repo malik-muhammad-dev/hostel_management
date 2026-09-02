@@ -9,8 +9,8 @@
 // =============================================================================
 
 class StudentDocumentModel {
-  final int? id;
-  final int studentId;
+  final String? id;
+  final String studentId;
 
   final String title;
   final String fileName;
@@ -27,8 +27,8 @@ class StudentDocumentModel {
   });
 
   StudentDocumentModel copyWith({
-    int? id,
-    int? studentId,
+    String? id,
+    String? studentId,
     String? title,
     String? fileName,
     String? filePath,
@@ -61,8 +61,8 @@ class StudentDocumentModel {
 
   factory StudentDocumentModel.fromMap(Map<String, Object?> map) {
     return StudentDocumentModel(
-      id: map['id'] as int?,
-      studentId: map['student_id'] as int,
+      id: map['id'] as String?,
+      studentId: map['student_id'] as String,
       title: map['title'] as String,
       fileName: map['file_name'] as String,
       filePath: map['file_path'] as String?,

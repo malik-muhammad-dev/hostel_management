@@ -307,7 +307,7 @@ class _ServicesCard extends StatelessWidget {
   Future<void> _showAddServiceDialog(
     BuildContext context,
     StudentServiceController controller,
-    int studentId,
+    String studentId,
   ) async {
     final nameController = TextEditingController();
     final descriptionController = TextEditingController();

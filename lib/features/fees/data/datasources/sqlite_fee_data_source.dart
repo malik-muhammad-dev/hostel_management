@@ -11,12 +11,12 @@ import 'fee_data_source.dart';
 //
 // Real persistence, swapped in for MockFeeDataSource once verified.
 //
-// Note on IDs: FeeController._nextId() already assigns the id (max
-// existing id + 1) before calling addTransaction()/addPayment() — this
-// datasource does NOT rely on SQLite's own AUTOINCREMENT, it inserts
-// whatever id is already on the model. Same pattern as
-// SqliteStudentDataSource, for the same reason: keeps the already-tested
-// controller logic completely untouched during this migration.
+// Note on IDs: the `id` column is now a client-generated UUID (TEXT
+// PRIMARY KEY, no AUTOINCREMENT), the same as every other table.
+// FeeController assigns the id (a v4 UUID) before calling
+// addTransaction()/addPayment() — this datasource just inserts whatever
+// id is already on the model, it never relies on SQLite to generate or
+// return one. Same pattern as SqliteStudentDataSource.
 //
 // Note on getStudentFeeSummaries()/getStudentFeeSummary(): these are not
 // backed by a separate table — there is no "student_fee_summary" table
@@ -63,7 +63,7 @@ class SqliteFeeDataSource implements FeeDataSource {
       final submitted = (row['submitted'] as num?)?.toDouble() ?? 0.0;
 
       return StudentFeeSummary(
-        studentId: row['student_id'] as int,
+        studentId: row['student_id'] as String,
         feeCharged: charged,
         feeSubmitted: submitted,
         feePending: charged - submitted,
@@ -72,7 +72,7 @@ class SqliteFeeDataSource implements FeeDataSource {
   }
 
   @override
-  Future<StudentFeeSummary?> getStudentFeeSummary(int studentId) async {
+  Future<StudentFeeSummary?> getStudentFeeSummary(String studentId) async {
     final db = await _db;
 
     final rows = await db.rawQuery(

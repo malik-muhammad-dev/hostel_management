@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../students/data/models/student_model.dart';
 import '../../../students/presentation/controllers/student_controller.dart';
@@ -37,7 +38,7 @@ class ReceiptController extends GetxController {
   // ===========================================================================
 
   final receivedFromType = Rxn<ReceivedFromType>();
-  final selectedStudentId = Rxn<int>();
+  final selectedStudentId = Rxn<String>();
 
   void setReceivedFromType(ReceivedFromType? type) {
     receivedFromType.value = type;
@@ -52,7 +53,7 @@ class ReceiptController extends GetxController {
     }
   }
 
-  void setSelectedStudent(int? studentId) {
+  void setSelectedStudent(String? studentId) {
     selectedStudentId.value = studentId;
   }
 
@@ -222,7 +223,7 @@ class ReceiptController extends GetxController {
     final notes = notesController.text.trim();
 
     String? receivedFrom;
-    int? studentId;
+    String? studentId;
 
     if (type == ReceivedFromType.student) {
       studentId = selectedStudentId.value;
@@ -261,7 +262,7 @@ class ReceiptController extends GetxController {
     try {
       isSaving.value = true;
 
-      final savedReceipt = receipt.copyWith(id: _nextReceiptId());
+      final savedReceipt = receipt.copyWith(id: const Uuid().v4());
 
       await repository.addReceipt(savedReceipt);
 
@@ -317,7 +318,7 @@ class ReceiptController extends GetxController {
   // DELETE RECEIPT
   // ===========================================================================
 
-  Future<bool> deleteReceipt(int receiptId) async {
+  Future<bool> deleteReceipt(String receiptId) async {
     try {
       isLoading.value = true;
 
@@ -376,21 +377,6 @@ class ReceiptController extends GetxController {
     paymentMode.value = null;
     receivedFromType.value = null;
     selectedStudentId.value = null;
-  }
-
-  // ===========================================================================
-  // NEXT RECEIPT ID
-  // ===========================================================================
-
-  int _nextReceiptId() {
-    if (receipts.isEmpty) {
-      return 1;
-    }
-
-    return receipts
-            .map((receipt) => receipt.id ?? 0)
-            .reduce((a, b) => a > b ? a : b) +
-        1;
   }
 
   // ===========================================================================

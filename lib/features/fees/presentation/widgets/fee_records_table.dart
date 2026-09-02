@@ -379,7 +379,7 @@ class _FeeRecordsTableState
   }
 
   StudentFeeSummary? _findSummary(
-    int studentId,
+    String studentId,
   ) {
     for (final summary in widget.summaries) {
       if (summary.studentId == studentId) {

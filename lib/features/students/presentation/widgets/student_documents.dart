@@ -7,7 +7,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../controllers/student_document_controller.dart';
 
 class StudentDocuments extends StatelessWidget {
-  final int studentId;
+  final String studentId;
 
   const StudentDocuments({super.key, required this.studentId});
 

@@ -131,7 +131,7 @@ class ExpenseRecordsTable extends StatelessWidget {
     );
   }
 
-  Future<void> _deleteExpense(int? expenseId) async {
+  Future<void> _deleteExpense(String? expenseId) async {
     if (expenseId == null) {
       return;
     }

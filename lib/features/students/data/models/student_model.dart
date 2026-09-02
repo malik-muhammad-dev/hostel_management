@@ -1,5 +1,5 @@
 class StudentModel {
-  final int? id;
+  final String? id;
 
   // ---------------------------------------------------------------------------
   // Personal information
@@ -120,7 +120,7 @@ class StudentModel {
   // ---------------------------------------------------------------------------
 
   StudentModel copyWith({
-    int? id,
+    String? id,
     String? name,
     String? fatherName,
     String? cnic,
@@ -276,7 +276,7 @@ class StudentModel {
 
   factory StudentModel.fromMap(Map<String, Object?> map) {
     return StudentModel(
-      id: map['id'] as int?,
+      id: map['id'] as String?,
 
       // Personal
       name: map['name'] as String,

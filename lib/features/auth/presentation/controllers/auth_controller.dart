@@ -1,6 +1,7 @@
 import 'package:bcrypt/bcrypt.dart';
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../data/models/app_user_model.dart';
 import '../../data/repositories/auth_repository.dart';
@@ -51,8 +52,12 @@ class AuthController extends GetxController {
 
       final adminHash = BCrypt.hashpw(_defaultAdminPassword, BCrypt.gensalt());
 
+      // `id` is a client-generated UUID — the `users.id` column has no
+      // AUTOINCREMENT to assign one on insert, so it must be set before
+      // this ever reaches the datasource.
       await repository.addUser(
         AppUser(
+          id: const Uuid().v4(),
           username: _defaultAdminUsername,
           passwordHash: adminHash,
           role: UserRole.admin,
@@ -66,6 +71,7 @@ class AuthController extends GetxController {
 
       await repository.addUser(
         AppUser(
+          id: const Uuid().v4(),
           username: _defaultFeeCollectorUsername,
           passwordHash: feeCollectorHash,
           role: UserRole.feeCollector,

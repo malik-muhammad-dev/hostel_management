@@ -1,4 +1,3 @@
-
 import 'package:hostel_management/features/students/data/models/student_document%20model.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
@@ -10,7 +9,7 @@ class SqliteStudentDocumentDataSource implements StudentDocumentDataSource {
 
   @override
   Future<List<StudentDocumentModel>> getDocumentsForStudent(
-    int studentId,
+    String studentId,
   ) async {
     final db = await _db;
     final rows = await db.query(
@@ -46,7 +45,7 @@ class SqliteStudentDocumentDataSource implements StudentDocumentDataSource {
   }
 
   @override
-  Future<void> deleteDocument(int documentId) async {
+  Future<void> deleteDocument(String documentId) async {
     final db = await _db;
     await db.delete(
       'student_documents',
