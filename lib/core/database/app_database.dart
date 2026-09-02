@@ -886,8 +886,18 @@ class AppDatabase {
       }
 
       // -- APP SETTINGS (still a single row, id stays 1 — just gains updated_at) --
+      //
+      // SQLite's ALTER TABLE ADD COLUMN rejects a non-constant default —
+      // datetime('now') is a function call, not a constant, so it's only
+      // allowed in CREATE TABLE (which is why _onCreate's version of this
+      // column is fine as-is). Here the column has to be added bare and
+      // then backfilled for the existing row.
       await db.execute(
-        "ALTER TABLE app_settings ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))",
+        'ALTER TABLE app_settings ADD COLUMN updated_at TEXT',
+      );
+      await db.execute(
+        'UPDATE app_settings SET updated_at = ? WHERE updated_at IS NULL',
+        [nowIso],
       );
 
       // -- CASH RECEIPTS (student_id is a soft reference — remap if present) ------
