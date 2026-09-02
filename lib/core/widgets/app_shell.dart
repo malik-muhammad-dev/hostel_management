@@ -10,6 +10,8 @@ import 'package:hostel_management/features/reports/presentation/screens/fee_coll
 import 'package:hostel_management/features/reports/presentation/screens/financial_report_screen.dart';
 import 'package:hostel_management/features/reports/presentation/screens/report_screen.dart';
 import 'package:hostel_management/features/settings/presentation/screens/setting_screen.dart';
+import 'package:hostel_management/features/receipts/presentation/screens/receipts_screen.dart';
+import 'package:hostel_management/features/receipts/presentation/screens/add_receipt_screen.dart';
 
 import 'package:hostel_management/features/students/presentation/screens/add_student_screen.dart';
 import 'package:hostel_management/features/students/presentation/screens/student_detail_screen.dart';
@@ -74,7 +76,7 @@ class AppShellController extends GetxController {
     if (authController.isFeeCollector) {
       return const [2];
     }
-    return const [0, 1, 2, 3, 4, 5];
+    return const [0, 1, 2, 3, 4, 5, 6];
   }
 
   // ---------------------------------------------------------------------------
@@ -111,6 +113,8 @@ class AppShellController extends GetxController {
         return 'Reports';
       case 5:
         return 'Settings';
+      case 6:
+        return 'Receipts';
       default:
         return 'Dashboard';
     }
@@ -149,6 +153,9 @@ class AppShellController extends GetxController {
 
       case 5:
         return const SettingsScreen();
+
+      case 6:
+        return const ReceiptsScreen();
 
       default:
         return const DashboardScreen();
@@ -230,6 +237,14 @@ class AppShellController extends GetxController {
 
   void openAddExpense() {
     pushPage(const AddExpenseScreen());
+  }
+
+  // ---------------------------------------------------------------------------
+  // Receipt navigation
+  // ---------------------------------------------------------------------------
+
+  void openAddReceipt() {
+    pushPage(const AddReceiptScreen());
   }
 
   // ---------------------------------------------------------------------------

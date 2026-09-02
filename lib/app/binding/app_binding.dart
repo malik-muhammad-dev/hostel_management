@@ -27,6 +27,11 @@ import 'package:hostel_management/features/settings/data/datasource/sqlite_app_s
 import 'package:hostel_management/features/settings/data/repositories/app_settings_repository.dart' show AppSettingsRepository;
 import 'package:hostel_management/features/settings/presentation/controllers/app_settings_controller.dart' show AppSettingsController;
 
+import 'package:hostel_management/features/receipts/data/datasources/receipt_data_source.dart' show ReceiptDataSource;
+import 'package:hostel_management/features/receipts/data/datasources/sqlite_receipt_data_source.dart' show SqliteReceiptDataSource;
+import 'package:hostel_management/features/receipts/data/repositories/receipt_repository.dart' show ReceiptRepository;
+import 'package:hostel_management/features/receipts/presentation/controllers/receipt_controller.dart' show ReceiptController;
+
 import '../../core/widgets/app_shell.dart';
 import '../../features/fees/data/datasources/fee_data_source.dart';
 import '../../features/fees/data/datasources/sqlite_fee_data_source.dart';
@@ -206,6 +211,27 @@ Get.lazyPut<AppSettingsController>(
   () => AppSettingsController(Get.find<AppSettingsRepository>()),
   fenix: true,
 );
+
+// ---------------------------------------------------------------------------
+// Cash Receipts — money received outside of student fees. Its own
+// independent data layer, same pattern as Expenses; DashboardController
+// reads its total but nothing here reads back into Fees/Expenses.
+// ---------------------------------------------------------------------------
+
+Get.lazyPut<ReceiptDataSource>(
+  () => SqliteReceiptDataSource(),
+  fenix: true,
+);
+
+Get.lazyPut<ReceiptRepository>(
+  () => ReceiptRepository(Get.find<ReceiptDataSource>()),
+  fenix: true,
+);
+
+Get.lazyPut<ReceiptController>(
+  () => ReceiptController(Get.find<ReceiptRepository>()),
+  fenix: true,
+);
   }
-  
+
 }

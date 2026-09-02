@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../../expenses/presentation/controllers/expense_controller.dart';
 import '../../../fees/presentation/controllers/fee_controller.dart';
+import '../../../receipts/presentation/controllers/receipt_controller.dart';
 import '../../../settings/presentation/controllers/app_settings_controller.dart';
 import '../../../students/data/models/student_model.dart';
 import '../../../students/presentation/controllers/student_controller.dart';
@@ -24,6 +25,7 @@ class DashboardController extends GetxController {
   final ExpenseController expenseController = Get.find<ExpenseController>();
   final AppSettingsController settingsController =
       Get.find<AppSettingsController>();
+  final ReceiptController receiptController = Get.find<ReceiptController>();
 
   static const _monthNames = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -173,11 +175,20 @@ class DashboardController extends GetxController {
     final opening = settingsController.openingBalance.value;
     final collected = allTimeCollected;
     final expenses = allTimeExpenses;
-    final result = opening + collected - expenses;
+    // Student Cash — client confirmed explicitly: only the "Account"
+    // portion counts here, never the "Cash" portion. Real-world reason:
+    // an Account-mode Student Cash entry is money genuinely arriving in
+    // the hostel's bank account (even though the cashier separately
+    // hands out the same amount as physical cash to the student — see
+    // ReceiptController.netCashBox for that side of it). A Cash-mode
+    // entry never touches this figure at all.
+    final studentCashAccount = receiptController.accountReceipts;
+    final result = opening + collected - expenses + studentCashAccount;
 
     debugPrint(
       '[TOTALS] totalAmount = openingBalance($opening) '
       '+ allTimeCollected($collected) − allTimeExpenses($expenses) '
+      '+ studentCashAccount($studentCashAccount) '
       '= $result',
     );
     debugPrint(
@@ -190,6 +201,18 @@ class DashboardController extends GetxController {
   }
 
   double get openingBalance => settingsController.openingBalance.value;
+
+  // ---------------------------------------------------------------------------
+  // Student Cash — the Dashboard's two boxes. Deliberately NOT a single
+  // combined figure: "Cash" is the net cash-on-hand effect (Cash entries
+  // add, Account entries subtract — see ReceiptController.netCashBox for
+  // the full reasoning) and "Account" is the raw Account-mode total,
+  // which is also the exact figure added into totalAmount above.
+  // ---------------------------------------------------------------------------
+
+  double get studentCashBox => receiptController.netCashBox;
+
+  double get studentCashAccountBox => receiptController.accountBox;
 
   Future<void> setOpeningBalance(double value) {
     debugPrint(
@@ -272,7 +295,19 @@ class DashboardController extends GetxController {
       );
     });
 
-    final combined = [...feeItems, ...expenseItems]
+    final receiptItems = receiptController.receipts.map((receipt) {
+      return RecentActivityItem(
+        title: (receipt.receivedFrom?.isNotEmpty ?? false)
+            ? receipt.receivedFrom!
+            : 'Cash Receipt',
+        subtitle: 'Student Cash',
+        amount: receipt.amount,
+        date: receipt.date,
+        isIncome: true,
+      );
+    });
+
+    final combined = [...feeItems, ...expenseItems, ...receiptItems]
       ..sort((a, b) => b.date.compareTo(a.date));
 
     return combined.take(6).toList();

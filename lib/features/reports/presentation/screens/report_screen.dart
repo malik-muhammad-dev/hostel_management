@@ -5,6 +5,7 @@ import 'package:hostel_management/core/widgets/app_shell.dart';
 import 'package:hostel_management/app/theme/app_colors.dart';
 import 'package:hostel_management/features/reports/presentation/screens/expense_report_screen.dart';
 import 'package:hostel_management/features/reports/presentation/screens/net_position_report_screen.dart';
+import 'package:hostel_management/features/reports/presentation/screens/student_cash_report_screen.dart';
 
 
 import 'fee_collection_report_screen.dart';
@@ -95,6 +96,17 @@ class _ReportCategories extends StatelessWidget {
           onTap: () {
             Get.find<AppShellController>().pushPage(
               const NetPositionReportScreen(),
+            );
+          },
+        ),
+        _ReportCategoryCard(
+          title: 'Student Cash Report',
+          description:
+              'Monthly cash received outside the regular fee',
+          icon: Icons.payments_outlined,
+          onTap: () {
+            Get.find<AppShellController>().pushPage(
+              const StudentCashReportScreen(),
             );
           },
         ),

@@ -129,114 +129,90 @@ class DashboardScreen extends StatelessWidget {
             final totalActiveStudents = controller.totalActiveStudents;
             final expensesThisMonth = controller.expensesThisMonth;
             final totalAmount = controller.totalAmount;
+            final studentCash = controller.studentCashBox;
+            final studentCashAccount = controller.studentCashAccountBox;
 
+            final cards = [
+              DashboardStatCard(
+                title: 'Active Students',
+                value: '$totalActiveStudents',
+                subtitle: totalWhoOwe == 0
+                    ? 'Currently enrolled'
+                    : '$paid/$totalWhoOwe paid this month',
+                icon: Icons.people_alt_rounded,
+                accentColor: const Color(0xFF3B7DC4),
+              ),
+              DashboardStatCard(
+                title: 'Collected',
+                value:
+                    '${_formatNumber(collected)} / ${_formatNumber(expected)}',
+                subtitle: 'Collected / Expected this month',
+                icon: Icons.payments_rounded,
+                accentColor: AppColors.success,
+              ),
+              DashboardStatCard(
+                title: 'Expenses',
+                value: _formatAmount(expensesThisMonth),
+                subtitle: 'This month',
+                icon: Icons.receipt_long_rounded,
+                accentColor: AppColors.accentGold,
+              ),
+              DashboardStatCard(
+                title: 'Net Profit',
+                value: _formatAmount(profit.abs()),
+                subtitle: isProfitable ? 'In profit' : 'Running at a loss',
+                icon: isProfitable
+                    ? Icons.trending_up_rounded
+                    : Icons.trending_down_rounded,
+                accentColor:
+                    isProfitable ? AppColors.primary : AppColors.error,
+              ),
+              DashboardStatCard(
+                title: 'Total Amount',
+                value: _formatAmount(totalAmount),
+                subtitle:
+                    'Opening balance + collected − expenses + Student Cash (Account)',
+                icon: Icons.account_balance_wallet_rounded,
+                accentColor: const Color(0xFF7C5CBF),
+                onEdit: () =>
+                    _showEditOpeningBalanceDialog(context, controller),
+              ),
+              DashboardStatCard(
+                title: 'Student Cash (Cash)',
+                value: _formatAmount(studentCash),
+                subtitle: 'All-time, outside the regular fee',
+                icon: Icons.payments_outlined,
+                accentColor: const Color(0xFF0E8A8A),
+              ),
+              DashboardStatCard(
+                title: 'Student Cash (Account)',
+                value: _formatAmount(studentCashAccount),
+                subtitle: 'All-time, outside the regular fee',
+                icon: Icons.account_balance_outlined,
+                accentColor: const Color(0xFF0E8A8A),
+              ),
+            ];
+
+            // A Wrap, not manually-indexed Rows — this card count has
+            // changed three times now (4 → 5 → 6 → 7) as features were
+            // added, and each time meant hand-editing row groupings and
+            // risking an off-by-one. A Wrap lays out any number of cards
+            // correctly on its own: 2 per row narrow, 3 per row wide,
+            // same visual result as before.
             return LayoutBuilder(
               builder: (context, constraints) {
-                final isNarrow = constraints.maxWidth < 900;
+                const spacing = 16.0;
+                final columns = constraints.maxWidth < 900 ? 2 : 3;
+                final cardWidth =
+                    (constraints.maxWidth - spacing * (columns - 1)) /
+                        columns;
 
-                final cards = [
-                  DashboardStatCard(
-                    title: 'Active Students',
-                    value: '$totalActiveStudents',
-                    subtitle: totalWhoOwe == 0
-                        ? 'Currently enrolled'
-                        : '$paid/$totalWhoOwe paid this month',
-                    icon: Icons.people_alt_rounded,
-                    accentColor: const Color(0xFF3B7DC4),
-                  ),
-                  DashboardStatCard(
-                    title: 'Collected',
-                    value:
-                        '${_formatNumber(collected)} / ${_formatNumber(expected)}',
-                    subtitle: 'Collected / Expected this month',
-                    icon: Icons.payments_rounded,
-                    accentColor: AppColors.success,
-                  ),
-                  DashboardStatCard(
-                    title: 'Expenses',
-                    value: _formatAmount(expensesThisMonth),
-                    subtitle: 'This month',
-                    icon: Icons.receipt_long_rounded,
-                    accentColor: AppColors.accentGold,
-                  ),
-                  DashboardStatCard(
-                    title: 'Net Profit',
-                    value: _formatAmount(profit.abs()),
-                    subtitle: isProfitable ? 'In profit' : 'Running at a loss',
-                    icon: isProfitable
-                        ? Icons.trending_up_rounded
-                        : Icons.trending_down_rounded,
-                    accentColor:
-                        isProfitable ? AppColors.primary : AppColors.error,
-                  ),
-                  DashboardStatCard(
-                    title: 'Total Amount',
-                    value: _formatAmount(totalAmount),
-                    subtitle:
-                        'Opening balance + collected − expenses (all-time)',
-                    icon: Icons.account_balance_wallet_rounded,
-                    accentColor: const Color(0xFF7C5CBF),
-                    onEdit: () =>
-                        _showEditOpeningBalanceDialog(context, controller),
-                  ),
-                ];
-
-                if (isNarrow) {
-                  // Narrow window — 2 per row, same wrapping style the
-                  // old 4-card layout already used, just one extra row
-                  // for the 5th card.
-                  return Column(
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(child: cards[0]),
-                          const SizedBox(width: 16),
-                          Expanded(child: cards[1]),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(child: cards[2]),
-                          const SizedBox(width: 16),
-                          Expanded(child: cards[3]),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(child: cards[4]),
-                          const SizedBox(width: 16),
-                          const Expanded(child: SizedBox()),
-                        ],
-                      ),
-                    ],
-                  );
-                }
-
-                // Wide window — 3-and-2 across two rows. A single row of
-                // all 5 (as the old 4-card layout did on wide screens)
-                // gets too cramped to read comfortably.
-                return Column(
+                return Wrap(
+                  spacing: spacing,
+                  runSpacing: spacing,
                   children: [
-                    Row(
-                      children: [
-                        for (var i = 0; i < 3; i++) ...[
-                          if (i != 0) const SizedBox(width: 16),
-                          Expanded(child: cards[i]),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(child: cards[3]),
-                        const SizedBox(width: 16),
-                        Expanded(child: cards[4]),
-                        const SizedBox(width: 16),
-                        const Expanded(child: SizedBox()),
-                      ],
-                    ),
+                    for (final card in cards)
+                      SizedBox(width: cardWidth, child: card),
                   ],
                 );
               },

@@ -24,6 +24,7 @@ class AppSidebar extends StatelessWidget {
       (Icons.receipt_long_rounded, 'Expenses'),
       (Icons.bar_chart_rounded, 'Reports'),
       (Icons.settings_outlined, 'Settings'),
+      (Icons.savings_rounded, 'Receipts'),
     ];
 
     // Pair each item with its original index so filtering never shifts

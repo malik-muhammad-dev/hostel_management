@@ -39,7 +39,7 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._internal();
 
   static const _dbName = 'onims_hostel.db';
-  static const _dbVersion = 8;
+  static const _dbVersion = 10;
 
   Database? _database;
 
@@ -305,6 +305,38 @@ class AppDatabase {
       'VALUES (1, 0, 100, 9, ?, NULL, NULL)',
       [_currentFeeMonthString()],
     );
+
+    // -------------------------------------------------------------------------
+    // Cash Receipts ("Student Cash" on screen) — money received that has
+    // nothing to do with a student's monthly FEE (e.g. a guardian sending
+    // cash for the student to be handed physical money, a faculty
+    // reimbursement, a donation). Deliberately a completely separate,
+    // standalone table — never read by Collected/Expected/Net Profit, and
+    // never touches `students`, `fee_payments`, or `fee_transactions`:
+    // - received_from / received_from_type / student_id are purely a
+    //   DISPLAY label ("who was this for") — student_id has no FOREIGN
+    //   KEY constraint on purpose, so deleting a student later can never
+    //   cascade-delete or break a historical cash record.
+    // - The one place this table's money DOES reach outside itself is
+    //   DashboardController.totalAmount, and only the "account" portion
+    //   of it — see the long comment on that getter for the exact rule
+    //   and why (client's own accounting logic, confirmed explicitly).
+    // -------------------------------------------------------------------------
+    await db.execute('''
+      CREATE TABLE cash_receipts (
+          id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+          date                TEXT NOT NULL,
+          amount              REAL NOT NULL,
+          payment_mode        TEXT NOT NULL CHECK (payment_mode IN ('cash', 'account')),
+          received_from       TEXT,
+          received_from_type  TEXT CHECK (received_from_type IN ('student', 'faculty')),
+          student_id          INTEGER,
+          notes               TEXT
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX idx_cash_receipts_date ON cash_receipts(date)',
+    );
   }
 
   /// "YYYY-MM" for the current real-world month — used only to stamp a
@@ -439,6 +471,52 @@ class AppDatabase {
       );
       await db.execute(
         'ALTER TABLE app_settings ADD COLUMN last_backup_at TEXT',
+      );
+    }
+
+    if (oldVersion < 9) {
+      // Cash Receipts — see the CREATE TABLE comment in _onCreate for the
+      // full explanation. A brand-new, independent table: this migration
+      // does not ALTER, read, or write a single existing table/column/
+      // row. An install upgrading to this version simply gains an empty
+      // Receipts ledger — every student, fee, expense, and settings row
+      // already on the client's machine is completely untouched.
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS cash_receipts (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            date            TEXT NOT NULL,
+            amount          REAL NOT NULL,
+            payment_mode    TEXT NOT NULL CHECK (payment_mode IN ('cash', 'account')),
+            received_from   TEXT,
+            notes           TEXT
+        )
+      ''');
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_cash_receipts_date ON cash_receipts(date)',
+      );
+    }
+
+    if (oldVersion < 10) {
+      // "Student Cash" — Cash Receipts entries now record WHO the cash
+      // was for: a specific enrolled student (student_id, purely a
+      // display reference — no FOREIGN KEY, so it can never cascade or
+      // block on a later student deletion) or a faculty member (just a
+      // typed name in received_from, received_from_type = 'faculty').
+      // Both new columns default to NULL, so every receipt entered
+      // before this update simply shows as "unspecified" — nothing
+      // about an existing row is rewritten.
+      // No CHECK constraint here (unlike the CREATE TABLE version above)
+      // — SQLite's ALTER TABLE ADD COLUMN support for CHECK constraints
+      // depends on the SQLite version bundled with sqflite on the
+      // client's machine, and this isn't worth risking on an upgrade
+      // path. The app already validates the value before saving
+      // (ReceiptController.validate()), so this is enforced at the
+      // application layer instead — same safety, no ALTER TABLE risk.
+      await db.execute(
+        'ALTER TABLE cash_receipts ADD COLUMN received_from_type TEXT',
+      );
+      await db.execute(
+        'ALTER TABLE cash_receipts ADD COLUMN student_id INTEGER',
       );
     }
   }
