@@ -7,5 +7,5 @@ abstract class ReceiptDataSource {
 
   Future<void> updateReceipt(ReceiptModel receipt);
 
-  Future<void> deleteReceipt(int receiptId);
+  Future<void> deleteReceipt(String receiptId);
 }

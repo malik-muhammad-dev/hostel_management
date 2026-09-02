@@ -9,7 +9,7 @@ abstract class FeeDataSource {
 
   Future<List<StudentFeeSummary>> getStudentFeeSummaries();
 
-  Future<StudentFeeSummary?> getStudentFeeSummary(int studentId);
+  Future<StudentFeeSummary?> getStudentFeeSummary(String studentId);
 
   Future<void> addPayment(FeePayment payment);
 

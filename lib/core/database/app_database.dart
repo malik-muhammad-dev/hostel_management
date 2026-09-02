@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:uuid/uuid.dart';
 
 
 // =============================================================================
@@ -14,8 +15,11 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 // rather than opening its own connection.
 //
 // Schema changes: bump `_dbVersion` and add a migration step inside
-// `_onUpgrade`. Never edit `_onCreate` retroactively for an app that's
-// already shipped with a lower version — old installs won't re-run it.
+// `_onUpgrade`. Never edit an OLD migration step retroactively for an
+// app that's already shipped past it — old installs won't re-run it.
+// `_onCreate` is the exception: it always reflects the CURRENT full
+// schema (for a brand-new install with no data to migrate), and is kept
+// in sync with whatever the latest `_onUpgrade` step produces.
 //
 // Database location: deliberately NOT sqflite's default
 // `getDatabasesPath()` — on desktop (via sqflite_common_ffi) that
@@ -39,7 +43,7 @@ class AppDatabase {
   static final AppDatabase instance = AppDatabase._internal();
 
   static const _dbName = 'onims_hostel.db';
-  static const _dbVersion = 10;
+  static const _dbVersion = 11;
 
   Database? _database;
 
@@ -122,17 +126,19 @@ class AppDatabase {
   Future<void> _onCreate(Database db, int version) async {
     await db.execute('''
       CREATE TABLE users (
-          id              INTEGER PRIMARY KEY AUTOINCREMENT,
+          id              TEXT PRIMARY KEY,
           username        TEXT NOT NULL UNIQUE,
           password_hash   TEXT NOT NULL,
           role            TEXT NOT NULL CHECK (role IN ('admin', 'feeCollector')),
-          created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+          created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+          deleted_at      TEXT
       )
     ''');
 
     await db.execute('''
       CREATE TABLE students (
-          id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+          id                          TEXT PRIMARY KEY,
           name                        TEXT NOT NULL,
           cnic                        TEXT,
           phone                       TEXT,
@@ -165,7 +171,9 @@ class AppDatabase {
           package_start_date          TEXT,
           monthly_fee                 REAL,
           net_monthly_fee             REAL,
-          ledger_id                   INTEGER
+          ledger_id                   INTEGER,
+          updated_at                  TEXT NOT NULL DEFAULT (datetime('now')),
+          deleted_at                  TEXT
       )
     ''');
     await db.execute(
@@ -177,12 +185,14 @@ class AppDatabase {
 
     await db.execute('''
       CREATE TABLE student_services (
-          id              INTEGER PRIMARY KEY AUTOINCREMENT,
-          student_id      INTEGER NOT NULL,
+          id              TEXT PRIMARY KEY,
+          student_id      TEXT NOT NULL,
           name            TEXT NOT NULL,
           description     TEXT,
           monthly_amount  REAL NOT NULL,
           is_active       INTEGER NOT NULL DEFAULT 1,
+          updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+          deleted_at      TEXT,
           FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
       )
     ''');
@@ -192,12 +202,14 @@ class AppDatabase {
 
     await db.execute('''
       CREATE TABLE student_documents (
-          id              INTEGER PRIMARY KEY AUTOINCREMENT,
-          student_id      INTEGER NOT NULL,
+          id              TEXT PRIMARY KEY,
+          student_id      TEXT NOT NULL,
           title           TEXT NOT NULL,
           file_name       TEXT NOT NULL,
           file_path       TEXT,
           is_required     INTEGER NOT NULL DEFAULT 0,
+          updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+          deleted_at      TEXT,
           FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
       )
     ''');
@@ -207,8 +219,8 @@ class AppDatabase {
 
     await db.execute('''
       CREATE TABLE fee_transactions (
-          id              INTEGER PRIMARY KEY AUTOINCREMENT,
-          student_id      INTEGER NOT NULL,
+          id              TEXT PRIMARY KEY,
+          student_id      TEXT NOT NULL,
           date            TEXT NOT NULL,
           fee_month       TEXT NOT NULL,
           description     TEXT,
@@ -216,6 +228,8 @@ class AppDatabase {
           credit          REAL NOT NULL DEFAULT 0,
           balance         REAL NOT NULL DEFAULT 0,
           type            TEXT NOT NULL CHECK (type IN ('charge', 'payment')),
+          updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+          deleted_at      TEXT,
           FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
       )
     ''');
@@ -225,8 +239,8 @@ class AppDatabase {
 
     await db.execute('''
       CREATE TABLE fee_payments (
-          id                          INTEGER PRIMARY KEY AUTOINCREMENT,
-          student_id                  INTEGER NOT NULL,
+          id                          TEXT PRIMARY KEY,
+          student_id                  TEXT NOT NULL,
           fee_month                   TEXT NOT NULL,
           current_month_fee           REAL NOT NULL,
           previous_balance            REAL NOT NULL,
@@ -241,6 +255,8 @@ class AppDatabase {
           notes                       TEXT,
           payment_date                TEXT NOT NULL,
           receipt_attachment_path     TEXT,
+          updated_at                  TEXT NOT NULL DEFAULT (datetime('now')),
+          deleted_at                  TEXT,
           FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
       )
     ''');
@@ -250,12 +266,14 @@ class AppDatabase {
 
     await db.execute('''
       CREATE TABLE expenses (
-          id              INTEGER PRIMARY KEY AUTOINCREMENT,
+          id              TEXT PRIMARY KEY,
           date            TEXT NOT NULL,
           category        TEXT NOT NULL DEFAULT 'Miscellaneous Expense',
           amount          REAL NOT NULL,
           description     TEXT,
-          payment_mode    TEXT NOT NULL CHECK (payment_mode IN ('cash', 'account'))
+          payment_mode    TEXT NOT NULL CHECK (payment_mode IN ('cash', 'account')),
+          updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+          deleted_at      TEXT
       )
     ''');
     await db.execute(
@@ -268,7 +286,9 @@ class AppDatabase {
     // -------------------------------------------------------------------------
     // A single-row settings table. `CHECK (id = 1)` keeps it a true
     // singleton; the row is always inserted here so app code can always
-    // assume it exists and just UPDATE it, never INSERT.
+    // assume it exists and just UPDATE it, never INSERT. Deliberately
+    // NOT given a uuid `id` or `deleted_at` — there is exactly one of
+    // these, for the one shared hostel, and it is never "deleted".
     //
     // - opening_balance: money already on hand before the hostel started
     //   using this app.
@@ -296,7 +316,8 @@ class AppDatabase {
           fine_due_day        INTEGER NOT NULL DEFAULT 9,
           fine_effective_from TEXT,
           backup_folder_path  TEXT,
-          last_backup_at      TEXT
+          last_backup_at      TEXT,
+          updated_at          TEXT NOT NULL DEFAULT (datetime('now'))
       )
     ''');
     await db.execute(
@@ -324,14 +345,16 @@ class AppDatabase {
     // -------------------------------------------------------------------------
     await db.execute('''
       CREATE TABLE cash_receipts (
-          id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+          id                  TEXT PRIMARY KEY,
           date                TEXT NOT NULL,
           amount              REAL NOT NULL,
           payment_mode        TEXT NOT NULL CHECK (payment_mode IN ('cash', 'account')),
           received_from       TEXT,
           received_from_type  TEXT CHECK (received_from_type IN ('student', 'faculty')),
-          student_id          INTEGER,
-          notes               TEXT
+          student_id          TEXT,
+          notes               TEXT,
+          updated_at          TEXT NOT NULL DEFAULT (datetime('now')),
+          deleted_at          TEXT
       )
     ''');
     await db.execute(
@@ -518,6 +541,407 @@ class AppDatabase {
       await db.execute(
         'ALTER TABLE cash_receipts ADD COLUMN student_id INTEGER',
       );
+    }
+
+    if (oldVersion < 11) {
+      // ===========================================================================
+      // MOVE TO UUID PRIMARY KEYS (+ soft delete, + updated_at)
+      //
+      // Preparing the local schema for Supabase (multiple PCs writing to
+      // a shared database need IDs that can never collide with each
+      // other, which a local "max(id) + 1" counter cannot guarantee once
+      // there's more than one writer). Every table's `id` moves from an
+      // auto-increment INTEGER to a UUID (TEXT), generated fresh here for
+      // every existing row. Every reference to a student (`student_id`)
+      // is rewritten to point at that student's new UUID. Nothing about
+      // the actual data — names, amounts, dates, notes — is touched;
+      // only the ID columns change.
+      //
+      // SQLite has no built-in "generate a random UUID" SQL function, so
+      // this reads each table's existing rows, generates the new IDs in
+      // Dart, and re-inserts the transformed rows into a freshly created
+      // table — the standard SQLite approach for a structural (not just
+      // additive) schema change (rename old -> create new -> copy ->
+      // [keep old]), per SQLite's own documented pattern for this.
+      //
+      // Deliberately NOT dropping the renamed `_old_v10` tables at the
+      // end of this migration. They cost a trivial amount of disk space
+      // and are a free safety net: if anything about this migration ever
+      // looks wrong on a real install, the original, untouched data is
+      // still sitting right there in the same file to compare against or
+      // recover from. They can be cleaned up manually later, once this
+      // has been confirmed working — never automatically.
+      //
+      // Foreign key enforcement is turned off for the duration of this
+      // block (SQLite's own recommended practice for this kind of
+      // multi-step rename/recreate migration) and turned back on
+      // immediately after, with an integrity check in between.
+      // ===========================================================================
+
+      await db.execute('PRAGMA foreign_keys = OFF');
+
+      const uuidGen = Uuid();
+      final nowIso = DateTime.now().toIso8601String();
+
+      // -- USERS ----------------------------------------------------------------
+      // No other table references a user's id, so no id-map is needed.
+      final oldUsers = await db.query('users');
+      await db.execute('ALTER TABLE users RENAME TO users_old_v10');
+      await db.execute('''
+        CREATE TABLE users (
+            id              TEXT PRIMARY KEY,
+            username        TEXT NOT NULL UNIQUE,
+            password_hash   TEXT NOT NULL,
+            role            TEXT NOT NULL CHECK (role IN ('admin', 'feeCollector')),
+            created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+            deleted_at      TEXT
+        )
+      ''');
+      for (final row in oldUsers) {
+        final newRow = Map<String, Object?>.from(row)
+          ..['id'] = uuidGen.v4()
+          ..['updated_at'] = nowIso
+          ..['deleted_at'] = null;
+        await db.insert('users', newRow);
+      }
+
+      // -- STUDENTS ---------------------------------------------------------------
+      // Build the old-int-id -> new-uuid map every dependent table below
+      // needs to rewrite its own student_id references.
+      final oldStudents = await db.query('students');
+      final studentIdMap = <int, String>{};
+      for (final row in oldStudents) {
+        studentIdMap[row['id'] as int] = uuidGen.v4();
+      }
+
+      await db.execute('ALTER TABLE students RENAME TO students_old_v10');
+      await db.execute('DROP INDEX IF EXISTS idx_students_roll_number');
+      await db.execute('DROP INDEX IF EXISTS idx_students_status');
+      await db.execute('''
+        CREATE TABLE students (
+            id                          TEXT PRIMARY KEY,
+            name                        TEXT NOT NULL,
+            cnic                        TEXT,
+            phone                       TEXT,
+            email                       TEXT,
+            date_of_birth               TEXT,
+            gender                      TEXT,
+            address                     TEXT,
+            photo_path                  TEXT,
+            guardian_name               TEXT,
+            guardian_relationship       TEXT,
+            guardian_cnic               TEXT,
+            guardian_primary_contact    TEXT,
+            guardian_alternate_contact  TEXT,
+            guardian_occupation         TEXT,
+            guardian_address            TEXT,
+            department                  TEXT,
+            program                     TEXT,
+            roll_number                 TEXT,
+            session                     TEXT,
+            semester                    TEXT,
+            admission_date              TEXT,
+            status                      TEXT,
+            hostel_block                TEXT,
+            room_number                 TEXT,
+            bed_number                  TEXT,
+            floor                       TEXT,
+            check_in_date               TEXT,
+            expected_check_out          TEXT,
+            hostel_status               TEXT,
+            package_start_date          TEXT,
+            monthly_fee                 REAL,
+            net_monthly_fee             REAL,
+            ledger_id                   INTEGER,
+            updated_at                  TEXT NOT NULL DEFAULT (datetime('now')),
+            deleted_at                  TEXT
+        )
+      ''');
+      await db.execute(
+        'CREATE INDEX idx_students_roll_number ON students(roll_number)',
+      );
+      await db.execute(
+        'CREATE INDEX idx_students_status ON students(status)',
+      );
+
+      for (final row in oldStudents) {
+        final oldId = row['id'] as int;
+        final newRow = Map<String, Object?>.from(row)
+          ..['id'] = studentIdMap[oldId]
+          ..['updated_at'] = nowIso
+          ..['deleted_at'] = null;
+        await db.insert('students', newRow);
+      }
+
+      // -- STUDENT SERVICES ---------------------------------------------------------
+      final oldServices = await db.query('student_services');
+      await db.execute(
+        'ALTER TABLE student_services RENAME TO student_services_old_v10',
+      );
+      await db.execute(
+        'DROP INDEX IF EXISTS idx_student_services_student_id',
+      );
+      await db.execute('''
+        CREATE TABLE student_services (
+            id              TEXT PRIMARY KEY,
+            student_id      TEXT NOT NULL,
+            name            TEXT NOT NULL,
+            description     TEXT,
+            monthly_amount  REAL NOT NULL,
+            is_active       INTEGER NOT NULL DEFAULT 1,
+            updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+            deleted_at      TEXT,
+            FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+        )
+      ''');
+      await db.execute(
+        'CREATE INDEX idx_student_services_student_id ON student_services(student_id)',
+      );
+      for (final row in oldServices) {
+        final newStudentId = studentIdMap[row['student_id'] as int];
+        if (newStudentId == null) {
+          debugPrint(
+            '[MIGRATION v11] Skipping orphaned student_services row '
+            '(id=${row['id']}) — its student_id no longer matches any '
+            'student. This should not happen given ON DELETE CASCADE, '
+            'and is only a defensive fallback.',
+          );
+          continue;
+        }
+        final newRow = Map<String, Object?>.from(row)
+          ..['id'] = uuidGen.v4()
+          ..['student_id'] = newStudentId
+          ..['updated_at'] = nowIso
+          ..['deleted_at'] = null;
+        await db.insert('student_services', newRow);
+      }
+
+      // -- STUDENT DOCUMENTS ---------------------------------------------------------
+      final oldDocuments = await db.query('student_documents');
+      await db.execute(
+        'ALTER TABLE student_documents RENAME TO student_documents_old_v10',
+      );
+      await db.execute(
+        'DROP INDEX IF EXISTS idx_student_documents_student_id',
+      );
+      await db.execute('''
+        CREATE TABLE student_documents (
+            id              TEXT PRIMARY KEY,
+            student_id      TEXT NOT NULL,
+            title           TEXT NOT NULL,
+            file_name       TEXT NOT NULL,
+            file_path       TEXT,
+            is_required     INTEGER NOT NULL DEFAULT 0,
+            updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+            deleted_at      TEXT,
+            FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+        )
+      ''');
+      await db.execute(
+        'CREATE INDEX idx_student_documents_student_id ON student_documents(student_id)',
+      );
+      for (final row in oldDocuments) {
+        final newStudentId = studentIdMap[row['student_id'] as int];
+        if (newStudentId == null) {
+          debugPrint(
+            '[MIGRATION v11] Skipping orphaned student_documents row '
+            '(id=${row['id']}) — its student_id no longer matches any '
+            'student.',
+          );
+          continue;
+        }
+        final newRow = Map<String, Object?>.from(row)
+          ..['id'] = uuidGen.v4()
+          ..['student_id'] = newStudentId
+          ..['updated_at'] = nowIso
+          ..['deleted_at'] = null;
+        await db.insert('student_documents', newRow);
+      }
+
+      // -- FEE TRANSACTIONS ---------------------------------------------------------
+      final oldFeeTransactions = await db.query('fee_transactions');
+      await db.execute(
+        'ALTER TABLE fee_transactions RENAME TO fee_transactions_old_v10',
+      );
+      await db.execute(
+        'DROP INDEX IF EXISTS idx_fee_transactions_student_month',
+      );
+      await db.execute('''
+        CREATE TABLE fee_transactions (
+            id              TEXT PRIMARY KEY,
+            student_id      TEXT NOT NULL,
+            date            TEXT NOT NULL,
+            fee_month       TEXT NOT NULL,
+            description     TEXT,
+            debit           REAL NOT NULL DEFAULT 0,
+            credit          REAL NOT NULL DEFAULT 0,
+            balance         REAL NOT NULL DEFAULT 0,
+            type            TEXT NOT NULL CHECK (type IN ('charge', 'payment')),
+            updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+            deleted_at      TEXT,
+            FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+        )
+      ''');
+      await db.execute(
+        'CREATE INDEX idx_fee_transactions_student_month ON fee_transactions(student_id, fee_month)',
+      );
+      for (final row in oldFeeTransactions) {
+        final newStudentId = studentIdMap[row['student_id'] as int];
+        if (newStudentId == null) {
+          debugPrint(
+            '[MIGRATION v11] Skipping orphaned fee_transactions row '
+            '(id=${row['id']}) — its student_id no longer matches any '
+            'student.',
+          );
+          continue;
+        }
+        final newRow = Map<String, Object?>.from(row)
+          ..['id'] = uuidGen.v4()
+          ..['student_id'] = newStudentId
+          ..['updated_at'] = nowIso
+          ..['deleted_at'] = null;
+        await db.insert('fee_transactions', newRow);
+      }
+
+      // -- FEE PAYMENTS ---------------------------------------------------------
+      final oldFeePayments = await db.query('fee_payments');
+      await db.execute(
+        'ALTER TABLE fee_payments RENAME TO fee_payments_old_v10',
+      );
+      await db.execute(
+        'DROP INDEX IF EXISTS idx_fee_payments_student_month',
+      );
+      await db.execute('''
+        CREATE TABLE fee_payments (
+            id                          TEXT PRIMARY KEY,
+            student_id                  TEXT NOT NULL,
+            fee_month                   TEXT NOT NULL,
+            current_month_fee           REAL NOT NULL,
+            previous_balance            REAL NOT NULL,
+            fine                        REAL NOT NULL DEFAULT 0,
+            discount                    REAL NOT NULL DEFAULT 0,
+            amount_received             REAL NOT NULL,
+            payment_method              TEXT NOT NULL CHECK (
+                                             payment_method IN
+                                             ('cash', 'bankTransfer', 'onlinePayment', 'cheque')
+                                         ),
+            payment_reference           TEXT,
+            notes                       TEXT,
+            payment_date                TEXT NOT NULL,
+            receipt_attachment_path     TEXT,
+            updated_at                  TEXT NOT NULL DEFAULT (datetime('now')),
+            deleted_at                  TEXT,
+            FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE
+        )
+      ''');
+      await db.execute(
+        'CREATE INDEX idx_fee_payments_student_month ON fee_payments(student_id, fee_month)',
+      );
+      for (final row in oldFeePayments) {
+        final newStudentId = studentIdMap[row['student_id'] as int];
+        if (newStudentId == null) {
+          debugPrint(
+            '[MIGRATION v11] Skipping orphaned fee_payments row '
+            '(id=${row['id']}) — its student_id no longer matches any '
+            'student.',
+          );
+          continue;
+        }
+        final newRow = Map<String, Object?>.from(row)
+          ..['id'] = uuidGen.v4()
+          ..['student_id'] = newStudentId
+          ..['updated_at'] = nowIso
+          ..['deleted_at'] = null;
+        await db.insert('fee_payments', newRow);
+      }
+
+      // -- EXPENSES (no student reference) -------------------------------------
+      final oldExpenses = await db.query('expenses');
+      await db.execute('ALTER TABLE expenses RENAME TO expenses_old_v10');
+      await db.execute('DROP INDEX IF EXISTS idx_expenses_date');
+      await db.execute('DROP INDEX IF EXISTS idx_expenses_category');
+      await db.execute('''
+        CREATE TABLE expenses (
+            id              TEXT PRIMARY KEY,
+            date            TEXT NOT NULL,
+            category        TEXT NOT NULL DEFAULT 'Miscellaneous Expense',
+            amount          REAL NOT NULL,
+            description     TEXT,
+            payment_mode    TEXT NOT NULL CHECK (payment_mode IN ('cash', 'account')),
+            updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+            deleted_at      TEXT
+        )
+      ''');
+      await db.execute('CREATE INDEX idx_expenses_date ON expenses(date)');
+      await db.execute(
+        'CREATE INDEX idx_expenses_category ON expenses(category)',
+      );
+      for (final row in oldExpenses) {
+        final newRow = Map<String, Object?>.from(row)
+          ..['id'] = uuidGen.v4()
+          ..['updated_at'] = nowIso
+          ..['deleted_at'] = null;
+        await db.insert('expenses', newRow);
+      }
+
+      // -- APP SETTINGS (still a single row, id stays 1 — just gains updated_at) --
+      await db.execute(
+        "ALTER TABLE app_settings ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))",
+      );
+
+      // -- CASH RECEIPTS (student_id is a soft reference — remap if present) ------
+      final oldReceipts = await db.query('cash_receipts');
+      await db.execute(
+        'ALTER TABLE cash_receipts RENAME TO cash_receipts_old_v10',
+      );
+      await db.execute('DROP INDEX IF EXISTS idx_cash_receipts_date');
+      await db.execute('''
+        CREATE TABLE cash_receipts (
+            id                  TEXT PRIMARY KEY,
+            date                TEXT NOT NULL,
+            amount              REAL NOT NULL,
+            payment_mode        TEXT NOT NULL CHECK (payment_mode IN ('cash', 'account')),
+            received_from       TEXT,
+            received_from_type  TEXT CHECK (received_from_type IN ('student', 'faculty')),
+            student_id          TEXT,
+            notes               TEXT,
+            updated_at          TEXT NOT NULL DEFAULT (datetime('now')),
+            deleted_at          TEXT
+        )
+      ''');
+      await db.execute(
+        'CREATE INDEX idx_cash_receipts_date ON cash_receipts(date)',
+      );
+      for (final row in oldReceipts) {
+        final oldStudentId = row['student_id'] as int?;
+        final newStudentId =
+            oldStudentId == null ? null : studentIdMap[oldStudentId];
+        final newRow = Map<String, Object?>.from(row)
+          ..['id'] = uuidGen.v4()
+          ..['student_id'] = newStudentId
+          ..['updated_at'] = nowIso
+          ..['deleted_at'] = null;
+        await db.insert('cash_receipts', newRow);
+      }
+
+      await db.execute('PRAGMA foreign_keys = ON');
+
+      // Confirms every FOREIGN KEY in the freshly rebuilt tables actually
+      // resolves. An empty result means everything checks out; a
+      // non-empty one is loud in the debug log rather than silent.
+      final integrityIssues = await db.rawQuery('PRAGMA foreign_key_check');
+      if (integrityIssues.isNotEmpty) {
+        debugPrint(
+          '[MIGRATION v11] WARNING — foreign_key_check found '
+          '${integrityIssues.length} issue(s) after migration: '
+          '$integrityIssues',
+        );
+      } else {
+        debugPrint(
+          '[MIGRATION v11] foreign_key_check passed — no issues found.',
+        );
+      }
     }
   }
 

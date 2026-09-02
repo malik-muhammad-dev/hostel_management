@@ -10,7 +10,7 @@ class StudentRepository {
     return dataSource.getStudents();
   }
 
-  Future<StudentModel?> getStudentById(int id) {
+  Future<StudentModel?> getStudentById(String id) {
     return dataSource.getStudentById(id);
   }
 
@@ -22,7 +22,7 @@ class StudentRepository {
     return dataSource.updateStudent(student);
   }
 
-  Future<void> deleteStudent(int id) {
+  Future<void> deleteStudent(String id) {
     return dataSource.deleteStudent(id);
   }
 }

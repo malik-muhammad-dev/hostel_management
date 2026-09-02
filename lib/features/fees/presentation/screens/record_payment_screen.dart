@@ -86,34 +86,23 @@ class RecordPaymentScreen extends StatelessWidget {
                 return;
               }
 
-              // Captured before submitPayment() clears/reloads state, so
-              // we can find the exact record that was just created.
+              // Captured before submitPayment() clears the form.
               final studentId = feeController.selectedStudentId.value;
-              final feeMonth = feeController.selectedFeeMonth.value;
 
-              final success = await feeController.submitPayment();
+              // submitPayment() now hands back the exact payment record
+              // it just created (already carrying its real, persisted
+              // UUID id) instead of just a bool — so there's no more
+              // need to go searching for "the just-created payment"
+              // afterward. The old approach found it by picking the
+              // highest id among that student/month's payments, which
+              // only worked because ids used to be sequential integers
+              // assigned by SQLite; that assumption no longer holds now
+              // that ids are UUIDs.
+              final justCreatedPayment = await feeController.submitPayment();
 
-              if (!success) {
+              if (justCreatedPayment == null) {
                 return;
               }
-
-              // Find the just-created payment — the highest id among
-              // this student/month's payments is the one that was just
-              // inserted (SQLite AUTOINCREMENT), giving us its real,
-              // persisted id for the receipt.
-              final matchingPayments = feeController.payments
-                  .where(
-                    (payment) =>
-                        payment.studentId == studentId &&
-                        payment.feeMonth == feeMonth,
-                  )
-                  .toList();
-
-              final justCreatedPayment = matchingPayments.isEmpty
-                  ? null
-                  : matchingPayments.reduce(
-                      (a, b) => (a.id ?? 0) > (b.id ?? 0) ? a : b,
-                    );
 
               final student = studentController.activeStudents
                   .firstWhereOrNull((student) => student.id == studentId);

@@ -1,5 +1,5 @@
 class StudentFeeSummary {
-  final int studentId;
+  final String studentId;
   final double feeCharged;
   final double feeSubmitted;
   final double feePending;

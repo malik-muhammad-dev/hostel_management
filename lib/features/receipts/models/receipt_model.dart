@@ -76,7 +76,7 @@ extension ReceivedFromTypeLabel on ReceivedFromType {
 
 @immutable
 class ReceiptModel {
-  final int? id;
+  final String? id;
 
   final DateTime date;
 
@@ -97,7 +97,7 @@ class ReceiptModel {
   /// purely a reference for possible future use; nothing in the app
   /// joins against it today, so a student being deleted later can never
   /// break or cascade into this table.
-  final int? studentId;
+  final String? studentId;
 
   final String? notes;
 
@@ -117,13 +117,13 @@ class ReceiptModel {
   // ---------------------------------------------------------------------------
 
   ReceiptModel copyWith({
-    int? id,
+    String? id,
     DateTime? date,
     double? amount,
     ReceiptPaymentMode? paymentMode,
     String? receivedFrom,
     ReceivedFromType? receivedFromType,
-    int? studentId,
+    String? studentId,
     String? notes,
   }) {
     return ReceiptModel(
@@ -163,7 +163,7 @@ class ReceiptModel {
     final typeName = map['received_from_type'] as String?;
 
     return ReceiptModel(
-      id: map['id'] as int?,
+      id: map['id'] as String?,
       date: DateTime.parse(map['date'] as String),
       amount: (map['amount'] as num).toDouble(),
       paymentMode: ReceiptPaymentMode.values.byName(
@@ -173,7 +173,7 @@ class ReceiptModel {
       receivedFromType: typeName == null
           ? null
           : ReceivedFromType.values.byName(typeName),
-      studentId: map['student_id'] as int?,
+      studentId: map['student_id'] as String?,
       notes: map['notes'] as String?,
     );
   }
