@@ -34,14 +34,19 @@ class SqliteFeeDataSource implements FeeDataSource {
   @override
   Future<List<FeeTransaction>> getTransactions() async {
     final db = await _db;
-    final rows = await db.query('fee_transactions', orderBy: 'id ASC');
+    // Ordered by rowid, not the `id` column — `id` is a UUID now (no
+    // ordering meaning at all), but every ordinary SQLite table still
+    // keeps an implicit, auto-incrementing `rowid` behind the scenes
+    // unless declared WITHOUT ROWID (this one isn't), so `rowid` still
+    // reflects insertion order exactly the way the old integer `id` did.
+    final rows = await db.query('fee_transactions', orderBy: 'rowid ASC');
     return rows.map(FeeTransaction.fromMap).toList();
   }
 
   @override
   Future<List<FeePayment>> getPayments() async {
     final db = await _db;
-    final rows = await db.query('fee_payments', orderBy: 'id ASC');
+    final rows = await db.query('fee_payments', orderBy: 'rowid ASC');
     return rows.map(FeePayment.fromMap).toList();
   }
 

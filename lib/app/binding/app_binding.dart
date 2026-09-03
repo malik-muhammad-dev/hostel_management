@@ -12,7 +12,7 @@ import 'package:hostel_management/features/reports/presentation/controllers/fee_
 import 'package:hostel_management/features/reports/presentation/controllers/report_controller.dart';
 import 'package:hostel_management/features/dashboard/presentation/controllers/dashboard_controller.dart';
 import 'package:hostel_management/features/students/data/datasources/sqlite_student_service_data_source.dart';
-import 'package:hostel_management/features/students/data/datasources/sqlite_student_data_source.dart';
+import 'package:hostel_management/features/students/data/datasources/supabase_student_data_source.dart';
 import 'package:hostel_management/features/students/data/datasources/sqlite_student_documnet_data_source.dart';
 import 'package:hostel_management/features/students/data/datasources/student_service_datasource.dart' show StudentServiceDataSource;
 import 'package:hostel_management/features/students/data/repositories/student_service_repository.dart' show StudentServiceRepository;
@@ -68,9 +68,18 @@ class AppBinding extends Bindings {
 
     // -------------------------------------------------------------------------
     // Student data layer
+    //
+    // Milestone 4, Step 1: Students is the first feature swapped from
+    // local SQLite to Supabase, per the migration design spec's delivery
+    // order. Every other feature below is still SqliteXDataSource for
+    // now — swapped one at a time, each one tested end-to-end before
+    // the next.
     // -------------------------------------------------------------------------
 
-    Get.lazyPut<StudentDataSource>(() => SqliteStudentDataSource(), fenix: true);
+    Get.lazyPut<StudentDataSource>(
+      () => SupabaseStudentDataSource(),
+      fenix: true,
+    );
 
     Get.lazyPut<StudentRepository>(
       () => StudentRepository(Get.find<StudentDataSource>()),

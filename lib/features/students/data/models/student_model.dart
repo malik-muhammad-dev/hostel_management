@@ -1,3 +1,15 @@
+// Postgres numeric columns come back from Supabase's REST API (PostgREST)
+// as JSON strings, not JSON numbers — PostgREST does this deliberately to
+// avoid precision loss (JSON numbers are IEEE doubles). SQLite's REAL
+// columns come back as actual num values already, so this just needs to
+// tolerate both sources without changing behavior for either.
+double? _parseNullableDouble(Object? value) {
+  if (value == null) return null;
+  if (value is num) return value.toDouble();
+  if (value is String) return double.tryParse(value);
+  return null;
+}
+
 class StudentModel {
   final String? id;
 
@@ -318,11 +330,13 @@ class StudentModel {
 
       // Financial
       packageStartDate: map['package_start_date'] as String?,
-      monthlyFee: (map['monthly_fee'] as num?)?.toDouble(),
-      netMonthlyFee: (map['net_monthly_fee'] as num?)?.toDouble(),
+      monthlyFee: _parseNullableDouble(map['monthly_fee']),
+      netMonthlyFee: _parseNullableDouble(map['net_monthly_fee']),
 
       // Ledger
-      ledgerId: map['ledger_id'] as int?,
+      ledgerId: map['ledger_id'] is String
+          ? int.tryParse(map['ledger_id'] as String)
+          : map['ledger_id'] as int?,
     );
   }
 }

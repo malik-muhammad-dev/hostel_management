@@ -10,7 +10,11 @@ class SqliteExpenseDataSource implements ExpenseDataSource {
   @override
   Future<List<ExpenseModel>> getExpenses() async {
     final db = await _db;
-    final rows = await db.query('expenses', orderBy: 'id ASC');
+    // Ordered by rowid, not `id` — `id` is now a UUID with no ordering
+    // meaning, but every ordinary SQLite table keeps an implicit
+    // auto-incrementing `rowid` (this one isn't WITHOUT ROWID), so it
+    // still reflects insertion order the way the old integer `id` did.
+    final rows = await db.query('expenses', orderBy: 'rowid ASC');
     return rows.map(ExpenseModel.fromMap).toList();
   }
 

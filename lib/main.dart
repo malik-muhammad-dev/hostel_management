@@ -2,12 +2,22 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app/app.dart';
+import 'core/config/supabase_config.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Connects to Supabase once, at startup, before anything else needs
+  // it. Every feature's SupabaseXDataSource reaches this same client
+  // through Supabase.instance.client rather than creating its own.
+  await Supabase.initialize(
+    url: SupabaseConfig.url,
+    anonKey: SupabaseConfig.anonKey,
+  );
 
   // Desktop platforms (Linux/Windows/macOS) don't have native sqflite
   // support — they need the ffi-backed factory instead. Android/iOS use

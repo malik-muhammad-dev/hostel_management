@@ -43,3 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Supabase keys — never committed. See supabase_config.example.dart for
+# the one-time setup needed on each PC that builds this app.
+lib/core/config/supabase_config.dart

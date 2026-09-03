@@ -10,7 +10,11 @@ class SqliteReceiptDataSource implements ReceiptDataSource {
   @override
   Future<List<ReceiptModel>> getReceipts() async {
     final db = await _db;
-    final rows = await db.query('cash_receipts', orderBy: 'id ASC');
+    // Ordered by rowid, not `id` — `id` is now a UUID with no ordering
+    // meaning, but every ordinary SQLite table keeps an implicit
+    // auto-incrementing `rowid` (this one isn't WITHOUT ROWID), so it
+    // still reflects insertion order the way the old integer `id` did.
+    final rows = await db.query('cash_receipts', orderBy: 'rowid ASC');
     return rows.map(ReceiptModel.fromMap).toList();
   }
 

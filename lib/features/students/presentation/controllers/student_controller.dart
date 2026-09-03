@@ -88,6 +88,15 @@ class StudentController extends GetxController {
       students.assignAll(result);
 
       _applyFilters();
+    } catch (e, stackTrace) {
+      // Was try/finally only, with no catch — harmless while this read
+      // from local SQLite, but Students now reads from Supabase over
+      // the network. Without this, a failed fetch (no internet, a bad
+      // key, an RLS issue) would throw uncaught and leave the screen
+      // stuck on its loading spinner with no visible error at all —
+      // whatever students were already loaded just stay as they are.
+      debugPrint('[DEBUG] loadStudents failed: $e');
+      debugPrint('[DEBUG] stackTrace: $stackTrace');
     } finally {
       isLoading.value = false;
     }
@@ -151,6 +160,15 @@ class StudentController extends GetxController {
       _applyFilters();
 
       return true;
+    } catch (e, stackTrace) {
+      // Was try/finally only, with no catch — harmless while this data
+      // came from local SQLite, but Students now reads/writes Supabase
+      // over the network, so a dropped connection here needs to fail
+      // gracefully (like addStudent/archiveStudent already do) instead
+      // of throwing an uncaught exception up into the UI.
+      debugPrint('[DEBUG] updateStudent failed: $e');
+      debugPrint('[DEBUG] stackTrace: $stackTrace');
+      return false;
     } finally {
       isLoading.value = false;
     }
