@@ -8,7 +8,6 @@ import 'package:hostel_management/features/expenses/data/datasources/expense_dat
 import 'package:hostel_management/features/expenses/data/datasources/sqlite_expense_data_source.dart' show SqliteExpenseDataSource;
 import 'package:hostel_management/features/expenses/data/repositories/expense_repository.dart' show ExpenseRepository;
 import 'package:hostel_management/features/expenses/presentation/controllers/expense_controller.dart' show ExpenseController;
-import 'package:hostel_management/features/fees/data/datasources/supabase_fee_datasource.dart';
 import 'package:hostel_management/features/reports/presentation/controllers/fee_collection_report_controller.dart';
 import 'package:hostel_management/features/reports/presentation/controllers/report_controller.dart';
 import 'package:hostel_management/features/dashboard/presentation/controllers/dashboard_controller.dart';
@@ -35,6 +34,7 @@ import 'package:hostel_management/features/receipts/presentation/controllers/rec
 
 import '../../core/widgets/app_shell.dart';
 import '../../features/fees/data/datasources/fee_data_source.dart';
+import '../../features/fees/data/datasources/supabase_fee_data_source.dart';
 import '../../features/fees/data/repositories/fee_repository.dart';
 import '../../features/fees/presentation/controllers/fee_controller.dart';
 import '../../features/students/data/datasources/student_data_source.dart';
