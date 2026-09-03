@@ -1,3 +1,13 @@
+// See the matching note in fee_transaction_model.dart — PostgREST (the
+// Supabase REST API) returns Postgres numeric columns as JSON strings,
+// not numbers, to avoid precision loss. These are NOT NULL money fields,
+// so an unparseable value fails loudly rather than silently reading 0.
+double _parseDouble(Object? value) {
+  if (value is num) return value.toDouble();
+  if (value is String) return double.parse(value);
+  throw FormatException('Expected a number for a fee amount, got: $value');
+}
+
 enum PaymentMethod { cash, bankTransfer, onlinePayment, cheque }
 
 class FeePayment {
@@ -62,11 +72,11 @@ class FeePayment {
       id: map['id'] as String?,
       studentId: map['student_id'] as String,
       feeMonth: map['fee_month'] as String,
-      currentMonthFee: (map['current_month_fee'] as num).toDouble(),
-      previousBalance: (map['previous_balance'] as num).toDouble(),
-      fine: (map['fine'] as num).toDouble(),
-      discount: (map['discount'] as num).toDouble(),
-      amountReceived: (map['amount_received'] as num).toDouble(),
+      currentMonthFee: _parseDouble(map['current_month_fee']),
+      previousBalance: _parseDouble(map['previous_balance']),
+      fine: _parseDouble(map['fine']),
+      discount: _parseDouble(map['discount']),
+      amountReceived: _parseDouble(map['amount_received']),
       paymentMethod: PaymentMethod.values.byName(
         map['payment_method'] as String,
       ),

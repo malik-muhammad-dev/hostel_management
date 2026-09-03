@@ -121,4 +121,38 @@ class SqliteFeeDataSource implements FeeDataSource {
       conflictAlgorithm: ConflictAlgorithm.abort,
     );
   }
+
+  @override
+  Future<void> recordPayment({
+    required FeePayment payment,
+    FeeTransaction? chargeTransaction,
+    required FeeTransaction paymentTransaction,
+  }) async {
+    final db = await _db;
+
+    // db.transaction() gives SQLite's own atomicity — either every insert
+    // below commits together, or (on any error) none of them do. See the
+    // note on FeeDataSource.recordPayment() for why this matters.
+    await db.transaction((txn) async {
+      await txn.insert(
+        'fee_payments',
+        payment.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.abort,
+      );
+
+      if (chargeTransaction != null) {
+        await txn.insert(
+          'fee_transactions',
+          chargeTransaction.toMap(),
+          conflictAlgorithm: ConflictAlgorithm.abort,
+        );
+      }
+
+      await txn.insert(
+        'fee_transactions',
+        paymentTransaction.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.abort,
+      );
+    });
+  }
 }

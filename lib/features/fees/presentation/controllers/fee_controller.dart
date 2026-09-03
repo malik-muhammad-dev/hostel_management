@@ -169,6 +169,15 @@ await loadStudentServiceAmounts();
         feeTableMonth.value = _latestMonthWithData() ?? _currentFeeMonth();
         _hasSetInitialMonth = true;
       }
+    } catch (e, stackTrace) {
+      // Was try/finally only, with no catch — harmless while this read
+      // from local SQLite, but Fees is about to read from Supabase over
+      // the network. Without this, a failed fetch (no internet, a bad
+      // key, an RLS issue) would throw uncaught and leave the screen
+      // stuck on its loading spinner with no visible error — whatever
+      // fee data was already loaded just stays as it is.
+      debugPrint('[DEBUG] loadFeeData failed: $e');
+      debugPrint('[DEBUG] stackTrace: $stackTrace');
     } finally {
       isLoading.value = false;
     }
@@ -890,10 +899,11 @@ return baseFee + serviceAmount;}
 
   // Returns the payment record that was just created (with its real,
   // persisted UUID id already on it — generated below, before saving),
-  // or null if validation failed. The caller no longer needs to guess
-  // which payment was "just created" by searching for the highest id
-  // afterward — that trick relied on ids being sequential integers,
-  // which stopped being true the moment ids became UUIDs.
+  // or null if validation failed OR the save itself failed. The caller
+  // no longer needs to guess which payment was "just created" by
+  // searching for the highest id afterward — that trick relied on ids
+  // being sequential integers, which stopped being true the moment ids
+  // became UUIDs.
   Future<FeePayment?> submitPayment() async {
     final validationMessage = validatePayment();
 
@@ -901,6 +911,24 @@ return baseFee + serviceAmount;}
       return null;
     }
 
+    try {
+      return await _submitPaymentUnsafe();
+    } catch (e, stackTrace) {
+      // This method used to have no try/catch around the actual save at
+      // all — harmless while every write was local SQLite, but this is
+      // the single highest-stakes place in the whole app to leave
+      // unguarded now that it writes to Supabase over the network: it's
+      // literally recording money received. A dropped connection here
+      // needs to fail visibly (record_payment_screen.dart already shows
+      // an error and lets the form be retried) instead of throwing
+      // uncaught mid-payment.
+      debugPrint('[DEBUG] submitPayment failed: $e');
+      debugPrint('[DEBUG] stackTrace: $stackTrace');
+      return null;
+    }
+  }
+
+  Future<FeePayment?> _submitPaymentUnsafe() async {
     final studentId = selectedStudentId.value!;
     final feeMonth = selectedFeeMonth.value;
     final paymentMethod = selectedPaymentMethod.value!;
@@ -974,19 +1002,16 @@ return baseFee + serviceAmount;}
     );
 
     // -------------------------------------------------------------------------
-    // Persist everything.
+    // Persist everything — as one atomic unit (see FeeDataSource.
+    // recordPayment()). Previously these were 3 separate sequential
+    // writes with nothing tying them together; a failure partway through
+    // could leave a payment recorded with no matching ledger entry.
     // -------------------------------------------------------------------------
 
-    await repository.addPayment(payment);
-
-    if (chargeTransaction != null) {
-      await repository.addTransaction(
-        chargeTransaction,
-      );
-    }
-
-    await repository.addTransaction(
-      paymentTransaction,
+    await repository.recordPayment(
+      payment: payment,
+      chargeTransaction: chargeTransaction,
+      paymentTransaction: paymentTransaction,
     );
 
     await loadFeeData();

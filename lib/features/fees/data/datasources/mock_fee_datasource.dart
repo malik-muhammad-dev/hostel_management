@@ -265,4 +265,17 @@ class MockFeeDataSource implements FeeDataSource {
   Future<void> addTransaction(FeeTransaction transaction) async {
     _transactions.add(transaction);
   }
+
+  @override
+  Future<void> recordPayment({
+    required FeePayment payment,
+    FeeTransaction? chargeTransaction,
+    required FeeTransaction paymentTransaction,
+  }) async {
+    _payments.add(payment);
+    if (chargeTransaction != null) {
+      _transactions.add(chargeTransaction);
+    }
+    _transactions.add(paymentTransaction);
+  }
 }

@@ -1,3 +1,17 @@
+// Postgres numeric columns come back from Supabase's REST API (PostgREST)
+// as JSON strings, not JSON numbers — deliberate, to avoid precision loss
+// (JSON numbers are IEEE doubles). SQLite's REAL columns already come
+// back as actual num values, so this just needs to tolerate both sources.
+// Unlike the nullable version used elsewhere, debit/credit/balance are
+// NOT NULL columns — if one somehow comes back missing or unparseable,
+// that's a real data problem on a money field and should fail loudly
+// rather than silently show as 0.
+double _parseDouble(Object? value) {
+  if (value is num) return value.toDouble();
+  if (value is String) return double.parse(value);
+  throw FormatException('Expected a number for a fee amount, got: $value');
+}
+
 enum FeeTransactionType { charge, payment }
 
 class FeeTransaction {
@@ -48,9 +62,9 @@ class FeeTransaction {
       date: map['date'] as String,
       feeMonth: map['fee_month'] as String,
       description: map['description'] as String?,
-      debit: (map['debit'] as num).toDouble(),
-      credit: (map['credit'] as num).toDouble(),
-      balance: (map['balance'] as num).toDouble(),
+      debit: _parseDouble(map['debit']),
+      credit: _parseDouble(map['credit']),
+      balance: _parseDouble(map['balance']),
       type: FeeTransactionType.values.byName(map['type'] as String),
     );
   }

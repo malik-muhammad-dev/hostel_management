@@ -31,4 +31,16 @@ class FeeRepository {
   Future<void> addTransaction(FeeTransaction transaction) {
     return dataSource.addTransaction(transaction);
   }
+
+  Future<void> recordPayment({
+    required FeePayment payment,
+    FeeTransaction? chargeTransaction,
+    required FeeTransaction paymentTransaction,
+  }) {
+    return dataSource.recordPayment(
+      payment: payment,
+      chargeTransaction: chargeTransaction,
+      paymentTransaction: paymentTransaction,
+    );
+  }
 }
