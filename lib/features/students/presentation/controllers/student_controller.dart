@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/realtime/realtime_table_sync.dart';
 import '../../data/models/student_model.dart';
 import '../../data/repositories/student_repository.dart';
 
@@ -65,6 +66,14 @@ class StudentController extends GetxController {
   final isLoading = false.obs;
 
   // ---------------------------------------------------------------------------
+  // Realtime — reloads from Supabase whenever `students` changes, from
+  // this PC or any other one. See RealtimeTableSync for why this exists
+  // and why it just re-runs loadStudents() rather than merging rows.
+  // ---------------------------------------------------------------------------
+
+  late final RealtimeTableSync _realtimeSync;
+
+  // ---------------------------------------------------------------------------
   // Lifecycle
   // ---------------------------------------------------------------------------
 
@@ -73,6 +82,17 @@ class StudentController extends GetxController {
     super.onInit();
 
     loadStudents();
+
+    _realtimeSync = RealtimeTableSync(
+      tables: const ['students'],
+      onChange: loadStudents,
+    );
+  }
+
+  @override
+  void onClose() {
+    _realtimeSync.dispose();
+    super.onClose();
   }
 
   // ---------------------------------------------------------------------------

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../core/realtime/realtime_table_sync.dart';
 import '../../../students/data/models/student_model.dart';
 import '../../../students/presentation/controllers/student_controller.dart';
 import '../../data/repositories/receipt_repository.dart';
@@ -82,6 +83,15 @@ class ReceiptController extends GetxController {
   // LIFECYCLE
   // ===========================================================================
 
+  // ---------------------------------------------------------------------------
+  // Realtime — reloads from Supabase whenever `cash_receipts` changes,
+  // from this PC or any other one. See RealtimeTableSync for why this
+  // exists and why it just re-runs loadReceipts() rather than merging
+  // rows.
+  // ---------------------------------------------------------------------------
+
+  late final RealtimeTableSync _realtimeSync;
+
   @override
   void onInit() {
     super.onInit();
@@ -90,10 +100,17 @@ class ReceiptController extends GetxController {
     selectedMonth.value = _monthKey(DateTime.now());
 
     loadReceipts();
+
+    _realtimeSync = RealtimeTableSync(
+      tables: const ['cash_receipts'],
+      onChange: loadReceipts,
+    );
   }
 
   @override
   void onClose() {
+    _realtimeSync.dispose();
+
     dateController.dispose();
     amountController.dispose();
     receivedFromController.dispose();

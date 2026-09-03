@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../core/realtime/realtime_table_sync.dart';
 import '../../../students/presentation/controllers/student_controller.dart';
 import '../../../students/presentation/controllers/student_service_controller.dart';
 import '../../../students/data/models/student_model.dart';
@@ -80,6 +81,15 @@ class FeeController extends GetxController {
   // switched to.
   bool _hasSetInitialMonth = false;
 
+  // ---------------------------------------------------------------------------
+  // Realtime — reloads from Supabase whenever fee_transactions or
+  // fee_payments changes, from this PC or any other one. See
+  // RealtimeTableSync for why this exists and why it just re-runs
+  // loadFeeData() rather than merging rows.
+  // ---------------------------------------------------------------------------
+
+  late final RealtimeTableSync _realtimeSync;
+
   @override
   void onInit() {
     super.onInit();
@@ -93,10 +103,17 @@ class FeeController extends GetxController {
     );
 
     loadFeeData();
+
+    _realtimeSync = RealtimeTableSync(
+      tables: const ['fee_transactions', 'fee_payments'],
+      onChange: loadFeeData,
+    );
   }
 
   @override
   void onClose() {
+    _realtimeSync.dispose();
+
     amountReceivedController.removeListener(
       _updateAmountReceived,
     );

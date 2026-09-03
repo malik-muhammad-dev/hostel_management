@@ -3,7 +3,6 @@ import 'package:get/get.dart';
 import '../../dashboard/presentation/controllers/dashboard_controller.dart';
 import '../../expenses/presentation/controllers/expense_controller.dart';
 import '../../fees/presentation/controllers/fee_controller.dart';
-import '../../receipts/presentation/controllers/receipt_controller.dart';
 import '../../students/presentation/controllers/student_controller.dart';
 
 // =============================================================================
@@ -54,7 +53,6 @@ class BackupReportGenerator {
     final feeController = Get.find<FeeController>();
     final studentController = Get.find<StudentController>();
     final expenseController = Get.find<ExpenseController>();
-    final receiptController = Get.find<ReceiptController>();
 
     final now = DateTime.now();
     final currentMonth = _monthKey(now);
@@ -161,15 +159,15 @@ class BackupReportGenerator {
     );
     buffer.writeln(
       _card(
-        'Student Cash (Cash)',
-        _formatAmount(receiptController.netCashBox),
+        'Total Cash',
+        _formatAmount(dashboard.cashBox),
         '',
       ),
     );
     buffer.writeln(
       _card(
-        'Student Cash (Account)',
-        _formatAmount(receiptController.accountBox),
+        'Total Account',
+        _formatAmount(dashboard.accountBox),
         '',
       ),
     );

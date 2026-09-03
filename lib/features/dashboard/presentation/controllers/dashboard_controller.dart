@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
 import '../../../expenses/presentation/controllers/expense_controller.dart';
+import '../../../fees/data/models/fee_payment_model.dart';
 import '../../../fees/presentation/controllers/fee_controller.dart';
 import '../../../receipts/presentation/controllers/receipt_controller.dart';
 import '../../../settings/presentation/controllers/app_settings_controller.dart';
@@ -203,16 +204,54 @@ class DashboardController extends GetxController {
   double get openingBalance => settingsController.openingBalance.value;
 
   // ---------------------------------------------------------------------------
-  // Student Cash — the Dashboard's two boxes. Deliberately NOT a single
-  // combined figure: "Cash" is the net cash-on-hand effect (Cash entries
-  // add, Account entries subtract — see ReceiptController.netCashBox for
-  // the full reasoning) and "Account" is the raw Account-mode total,
-  // which is also the exact figure added into totalAmount above.
+  // Cash / Account — whole-app totals (confirmed with the client,
+  // explained with their own worked example: 5 students, 50k total fee,
+  // 2 paid by cash / 3 by bank = 20k Cash, 30k Account; then a 500 Rs
+  // Student Cash "Account" entry moves Cash to 19,500 and Account to
+  // 30,500 while Total Amount goes to 50,500).
+  //
+  // Two different sources feed each box, and they behave differently —
+  // this is intentional, not an inconsistency:
+  //
+  // - FEE payments: a Cash-method payment adds to Cash; any other method
+  //   (bank transfer, online, cheque) adds to Account. Nothing is ever
+  //   deducted for fees — paying a fee by bank transfer doesn't involve
+  //   the cashier handing out physical cash, so there's no real-world
+  //   cash movement to reflect. Cash + Account across Fees always equals
+  //   the fee total collected, exactly like the client's example (20k +
+  //   30k = 50k).
+  //
+  // - STUDENT CASH (Receipts) "Account" entries are the one exception:
+  //   they add to Account AND subtract from Cash, because that one
+  //   specific workflow really does involve the cashier handing out
+  //   physical cash while the money lands in the bank (see
+  //   ReceiptController.netCashBox). Student Cash "Cash" entries just
+  //   add to Cash, same as everywhere else.
+  //
+  // Total Amount (above) already includes every fee payment regardless
+  // of method (via allTimeCollected) plus the Account portion of
+  // Student Cash — that formula was already correct and needed no
+  // change here.
   // ---------------------------------------------------------------------------
 
-  double get studentCashBox => receiptController.netCashBox;
+  double get _feeCashCollected {
+    return feeController.payments
+        .where((payment) => payment.paymentMethod == PaymentMethod.cash)
+        .fold<double>(0.0, (sum, payment) => sum + payment.amountReceived);
+  }
 
-  double get studentCashAccountBox => receiptController.accountBox;
+  double get _feeNonCashCollected {
+    return feeController.payments
+        .where((payment) => payment.paymentMethod != PaymentMethod.cash)
+        .fold<double>(0.0, (sum, payment) => sum + payment.amountReceived);
+  }
+
+  double get cashBox =>
+      _feeCashCollected + receiptController.cashReceipts -
+      receiptController.accountReceipts;
+
+  double get accountBox =>
+      _feeNonCashCollected + receiptController.accountReceipts;
 
   Future<void> setOpeningBalance(double value) {
     debugPrint(

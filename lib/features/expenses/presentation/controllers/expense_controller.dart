@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../core/realtime/realtime_table_sync.dart';
 import '../../data/repositories/expense_repository.dart';
 import '../../models/expense_model.dart';
 
@@ -58,6 +59,14 @@ class ExpenseController extends GetxController {
   // LIFECYCLE
   // ===========================================================================
 
+  // ---------------------------------------------------------------------------
+  // Realtime — reloads from Supabase whenever `expenses` changes, from
+  // this PC or any other one. See RealtimeTableSync for why this exists
+  // and why it just re-runs loadExpenses() rather than merging rows.
+  // ---------------------------------------------------------------------------
+
+  late final RealtimeTableSync _realtimeSync;
+
   @override
   void onInit() {
     super.onInit();
@@ -69,10 +78,17 @@ class ExpenseController extends GetxController {
     selectedMonth.value = _monthKey(DateTime.now());
 
     loadExpenses();
+
+    _realtimeSync = RealtimeTableSync(
+      tables: const ['expenses'],
+      onChange: loadExpenses,
+    );
   }
 
   @override
   void onClose() {
+    _realtimeSync.dispose();
+
     dateController.dispose();
     amountController.dispose();
     descriptionController.dispose();

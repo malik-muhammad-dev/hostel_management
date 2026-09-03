@@ -129,8 +129,8 @@ class DashboardScreen extends StatelessWidget {
             final totalActiveStudents = controller.totalActiveStudents;
             final expensesThisMonth = controller.expensesThisMonth;
             final totalAmount = controller.totalAmount;
-            final studentCash = controller.studentCashBox;
-            final studentCashAccount = controller.studentCashAccountBox;
+            final cash = controller.cashBox;
+            final account = controller.accountBox;
 
             final cards = [
               DashboardStatCard(
@@ -178,16 +178,16 @@ class DashboardScreen extends StatelessWidget {
                     _showEditOpeningBalanceDialog(context, controller),
               ),
               DashboardStatCard(
-                title: 'Student Cash (Cash)',
-                value: _formatAmount(studentCash),
-                subtitle: 'All-time, outside the regular fee',
+                title: 'Total Cash',
+                value: _formatAmount(cash),
+                subtitle: 'All-time, Fees + Student Cash combined',
                 icon: Icons.payments_outlined,
                 accentColor: const Color(0xFF0E8A8A),
               ),
               DashboardStatCard(
-                title: 'Student Cash (Account)',
-                value: _formatAmount(studentCashAccount),
-                subtitle: 'All-time, outside the regular fee',
+                title: 'Total Account',
+                value: _formatAmount(account),
+                subtitle: 'All-time, Fees + Student Cash combined',
                 icon: Icons.account_balance_outlined,
                 accentColor: const Color(0xFF0E8A8A),
               ),
