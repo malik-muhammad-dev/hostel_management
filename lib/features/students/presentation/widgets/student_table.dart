@@ -4,6 +4,7 @@ import 'package:hostel_management/core/widgets/app_shell.dart';
 import 'package:hostel_management/features/students/presentation/controllers/student_controller.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/widgets/shimmer_box.dart';
 import 'student_table_row.dart';
 
 // =============================================================================
@@ -61,6 +62,16 @@ class StudentTable extends StatelessWidget {
 
   Widget _buildRows(StudentController controller) {
     final pageStudents = controller.paginatedStudents;
+
+    // Shimmer only on the very first load (nothing fetched yet) — never
+    // over a page that already has real students on it, even while a
+    // quiet background refresh from real-time sync is running.
+    if (controller.isLoading.value && pageStudents.isEmpty) {
+      return const TableSkeleton(
+        columnFlexes: [3, 2, 2, 2],
+        trailingWidth: 90,
+      );
+    }
 
     if (pageStudents.isEmpty) {
       return const Padding(

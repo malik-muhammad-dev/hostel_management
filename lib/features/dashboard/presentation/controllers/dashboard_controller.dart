@@ -33,6 +33,30 @@ class DashboardController extends GetxController {
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
 
+  // ---------------------------------------------------------------------------
+  // Still-loading check — true only on the very first load, before ANY
+  // of the four underlying controllers has ever fetched anything. Once
+  // real data has loaded once, this stays false forever after, even
+  // while a quiet background refresh (from real-time sync) is running —
+  // the skeleton should never flash back over data that's already on
+  // screen, only stand in before there's anything to show at all.
+  // ---------------------------------------------------------------------------
+
+  bool get isInitialLoading {
+    final anyLoading = studentController.isLoading.value ||
+        feeController.isLoading.value ||
+        expenseController.isLoading.value ||
+        receiptController.isLoading.value;
+
+    final allEmpty = studentController.students.isEmpty &&
+        feeController.payments.isEmpty &&
+        feeController.transactions.isEmpty &&
+        expenseController.expenses.isEmpty &&
+        receiptController.receipts.isEmpty;
+
+    return anyLoading && allEmpty;
+  }
+
   String _monthKey(DateTime date) {
     return '${date.year.toString().padLeft(4, '0')}-'
         '${date.month.toString().padLeft(2, '0')}';

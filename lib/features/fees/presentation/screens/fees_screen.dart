@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/widgets/shimmer_box.dart';
 import '../../../settings/presentation/controllers/app_settings_controller.dart';
 import '../../../students/presentation/controllers/student_controller.dart';
 
 import '../controllers/fee_controller.dart';
 import '../widgets/fee_records_table.dart';
 import '../widgets/fee_summary.dart';
+import '../widgets/fee_table_header.dart';
 
 class FeesScreen extends StatelessWidget {
   const FeesScreen({super.key});
@@ -249,6 +251,35 @@ class FeesScreen extends StatelessWidget {
                       ),
                     )
                     .toList();
+
+            // Shimmer only on the very first load (neither Students nor
+            // Fees has fetched anything yet) — never over a page that
+            // already has real rows, even during a quiet background
+            // refresh from real-time sync.
+            final isInitialLoading =
+                (studentController.isLoading.value ||
+                    feeController.isLoading.value) &&
+                visibleStudents.isEmpty;
+
+            if (isInitialLoading) {
+              return Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: const Column(
+                  children: [
+                    FeeTableHeader(),
+                    TableSkeleton(
+                      columnFlexes: [3, 2, 2, 2, 2],
+                      trailingWidth: 90,
+                    ),
+                  ],
+                ),
+              );
+            }
 
             return FeeRecordsTable(
               students: visibleStudents,

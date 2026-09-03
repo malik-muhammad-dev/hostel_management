@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../controllers/dashboard_controller.dart';
 import '../widgets/dashboard_greeting_banner.dart';
+import '../widgets/dashboard_skeleton.dart';
 import '../widgets/dashboard_stat_card.dart';
 import '../widgets/expense_breakdown.dart';
 import '../widgets/recent_transactions.dart';
@@ -105,6 +106,49 @@ class DashboardScreen extends StatelessWidget {
           const SizedBox(height: 24),
 
           // -----------------------------------------------------------------
+          // Everything below is skeleton-loaded on the very first fetch —
+          // see DashboardController.isInitialLoading for exactly when
+          // that is (and, just as importantly, when it stops being true
+          // for good).
+          // -----------------------------------------------------------------
+          Obx(() {
+            if (controller.isInitialLoading) {
+              return const DashboardSkeleton();
+            }
+
+            return _DashboardContent(
+              controller: controller,
+              formatAmount: _formatAmount,
+              formatNumber: _formatNumber,
+              onEditOpeningBalance: () =>
+                  _showEditOpeningBalanceDialog(context, controller),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashboardContent extends StatelessWidget {
+  final DashboardController controller;
+  final String Function(double) formatAmount;
+  final String Function(double) formatNumber;
+  final VoidCallback onEditOpeningBalance;
+
+  const _DashboardContent({
+    required this.controller,
+    required this.formatAmount,
+    required this.formatNumber,
+    required this.onEditOpeningBalance,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+          // -----------------------------------------------------------------
           // Stat cards
           // -----------------------------------------------------------------
           Obx(() {
@@ -145,21 +189,21 @@ class DashboardScreen extends StatelessWidget {
               DashboardStatCard(
                 title: 'Collected',
                 value:
-                    '${_formatNumber(collected)} / ${_formatNumber(expected)}',
+                    '${formatNumber(collected)} / ${formatNumber(expected)}',
                 subtitle: 'Collected / Expected this month',
                 icon: Icons.payments_rounded,
                 accentColor: AppColors.success,
               ),
               DashboardStatCard(
                 title: 'Expenses',
-                value: _formatAmount(expensesThisMonth),
+                value: formatAmount(expensesThisMonth),
                 subtitle: 'This month',
                 icon: Icons.receipt_long_rounded,
                 accentColor: AppColors.accentGold,
               ),
               DashboardStatCard(
                 title: 'Net Profit',
-                value: _formatAmount(profit.abs()),
+                value: formatAmount(profit.abs()),
                 subtitle: isProfitable ? 'In profit' : 'Running at a loss',
                 icon: isProfitable
                     ? Icons.trending_up_rounded
@@ -169,24 +213,23 @@ class DashboardScreen extends StatelessWidget {
               ),
               DashboardStatCard(
                 title: 'Total Amount',
-                value: _formatAmount(totalAmount),
+                value: formatAmount(totalAmount),
                 subtitle:
                     'Opening balance + collected − expenses + Student Cash (Account)',
                 icon: Icons.account_balance_wallet_rounded,
                 accentColor: const Color(0xFF7C5CBF),
-                onEdit: () =>
-                    _showEditOpeningBalanceDialog(context, controller),
+                onEdit: onEditOpeningBalance,
               ),
               DashboardStatCard(
                 title: 'Total Cash',
-                value: _formatAmount(cash),
+                value: formatAmount(cash),
                 subtitle: 'All-time, Fees + Student Cash combined',
                 icon: Icons.payments_outlined,
                 accentColor: const Color(0xFF0E8A8A),
               ),
               DashboardStatCard(
                 title: 'Total Account',
-                value: _formatAmount(account),
+                value: formatAmount(account),
                 subtitle: 'All-time, Fees + Student Cash combined',
                 icon: Icons.account_balance_outlined,
                 accentColor: const Color(0xFF0E8A8A),
@@ -263,8 +306,7 @@ class DashboardScreen extends StatelessWidget {
           // Recent activity
           // -----------------------------------------------------------------
           RecentTransactions(controller: controller),
-        ],
-      ),
+      ],
     );
   }
 }
