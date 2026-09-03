@@ -5,7 +5,7 @@ import 'package:hostel_management/features/auth/data/datasource/sqlite_auth_data
 import 'package:hostel_management/features/auth/data/repositories/auth_repository.dart';
 import 'package:hostel_management/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:hostel_management/features/expenses/data/datasources/expense_data_source.dart' show ExpenseDataSource;
-import 'package:hostel_management/features/expenses/data/datasources/sqlite_expense_data_source.dart' show SqliteExpenseDataSource;
+import 'package:hostel_management/features/expenses/data/datasources/supabase_expense_data_source.dart' show SupabaseExpenseDataSource;
 import 'package:hostel_management/features/expenses/data/repositories/expense_repository.dart' show ExpenseRepository;
 import 'package:hostel_management/features/expenses/presentation/controllers/expense_controller.dart' show ExpenseController;
 import 'package:hostel_management/features/reports/presentation/controllers/fee_collection_report_controller.dart';
@@ -161,8 +161,10 @@ Get.lazyPut<StudentServiceController>(
 // Expenses
 // ---------------------------------------------------------------------------
 
+// Milestone 4, Step 3: Expenses is the third feature swapped from
+// local SQLite to Supabase.
 Get.lazyPut<ExpenseDataSource>(
-  () => SqliteExpenseDataSource(),
+  () => SupabaseExpenseDataSource(),
   fenix: true,
 );
 

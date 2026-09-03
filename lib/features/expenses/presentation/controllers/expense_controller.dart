@@ -92,6 +92,14 @@ class ExpenseController extends GetxController {
       final result = await repository.getExpenses();
 
       expenses.assignAll(result);
+    } catch (e, stackTrace) {
+      // Was try/finally only, with no catch — harmless while this read
+      // from local SQLite, but Expenses is about to read from Supabase
+      // over the network. Without this, a failed fetch would throw
+      // uncaught and leave the screen stuck loading with no visible
+      // error — whatever expenses were already loaded just stay as-is.
+      debugPrint('[DEBUG] loadExpenses failed: $e');
+      debugPrint('[DEBUG] stackTrace: $stackTrace');
     } finally {
       isLoading.value = false;
     }
