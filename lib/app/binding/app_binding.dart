@@ -28,7 +28,7 @@ import 'package:hostel_management/features/settings/data/repositories/app_settin
 import 'package:hostel_management/features/settings/presentation/controllers/app_settings_controller.dart' show AppSettingsController;
 
 import 'package:hostel_management/features/receipts/data/datasources/receipt_data_source.dart' show ReceiptDataSource;
-import 'package:hostel_management/features/receipts/data/datasources/sqlite_receipt_data_source.dart' show SqliteReceiptDataSource;
+import 'package:hostel_management/features/receipts/data/datasources/supabase_receipt_data_source.dart' show SupabaseReceiptDataSource;
 import 'package:hostel_management/features/receipts/data/repositories/receipt_repository.dart' show ReceiptRepository;
 import 'package:hostel_management/features/receipts/presentation/controllers/receipt_controller.dart' show ReceiptController;
 
@@ -233,7 +233,7 @@ Get.lazyPut<AppSettingsController>(
 // ---------------------------------------------------------------------------
 
 Get.lazyPut<ReceiptDataSource>(
-  () => SqliteReceiptDataSource(),
+  () => SupabaseReceiptDataSource(),
   fenix: true,
 );
 

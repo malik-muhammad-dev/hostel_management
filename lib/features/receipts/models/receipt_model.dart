@@ -1,5 +1,16 @@
 import 'package:flutter/foundation.dart';
 
+// Postgres numeric columns come back from Supabase's REST API (PostgREST)
+// as JSON strings, not JSON numbers — deliberate, to avoid precision loss.
+// SQLite's REAL columns already come back as actual num values, so this
+// just needs to tolerate both sources. `amount` is a NOT NULL column, so
+// an unparseable value fails loudly rather than silently reading as 0.
+double _parseDouble(Object? value) {
+  if (value is num) return value.toDouble();
+  if (value is String) return double.parse(value);
+  throw FormatException('Expected a number for a receipt amount, got: $value');
+}
+
 // =============================================================================
 // RECEIPT PAYMENT MODE
 //
@@ -165,7 +176,7 @@ class ReceiptModel {
     return ReceiptModel(
       id: map['id'] as String?,
       date: DateTime.parse(map['date'] as String),
-      amount: (map['amount'] as num).toDouble(),
+      amount: _parseDouble(map['amount']),
       paymentMode: ReceiptPaymentMode.values.byName(
         map['payment_mode'] as String,
       ),

@@ -113,6 +113,14 @@ class ReceiptController extends GetxController {
       final result = await repository.getReceipts();
 
       receipts.assignAll(result);
+    } catch (e, stackTrace) {
+      // Was try/finally only, with no catch — harmless while this read
+      // from local SQLite, but Receipts is about to read from Supabase
+      // over the network. Without this, a failed fetch would throw
+      // uncaught and leave the screen stuck loading with no visible
+      // error — whatever receipts were already loaded just stay as-is.
+      debugPrint('[RECEIPTS] loadReceipts failed: $e');
+      debugPrint('$stackTrace');
     } finally {
       isLoading.value = false;
     }
