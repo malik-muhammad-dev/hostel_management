@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../core/logging/app_error_logger.dart';
 import '../../../../core/realtime/realtime_table_sync.dart';
 import '../../data/repositories/expense_repository.dart';
 import '../../models/expense_model.dart';
@@ -101,7 +102,15 @@ class ExpenseController extends GetxController {
   // LOAD EXPENSES
   // ===========================================================================
 
-  Future<void> loadExpenses() async {
+  // [notifyOnFailure] is false when this is called right after this
+  // controller's own successful write (addExpense reloads immediately
+  // afterward just to pick up the DB-assigned voucher_no). A transient
+  // failure on THAT specific reload must not show "Couldn't load
+  // Expenses" — the money was already recorded successfully; a scary
+  // snackbar right after a successful save would look like the save
+  // itself failed. The initial load (onInit) and the realtime-sync-
+  // triggered reload both keep the default of true.
+  Future<void> loadExpenses({bool notifyOnFailure = true}) async {
     try {
       isLoading.value = true;
 
@@ -116,6 +125,10 @@ class ExpenseController extends GetxController {
       // error — whatever expenses were already loaded just stay as-is.
       debugPrint('[DEBUG] loadExpenses failed: $e');
       debugPrint('[DEBUG] stackTrace: $stackTrace');
+      AppErrorLogger.log('ExpenseController.loadExpenses', e, stackTrace);
+      if (notifyOnFailure) {
+        AppErrorLogger.notifyLoadFailure('Expenses');
+      }
     } finally {
       isLoading.value = false;
     }
@@ -253,6 +266,12 @@ class ExpenseController extends GetxController {
 
     return ExpenseModel(
       id: editingExpense.value?.id,
+      // Carry the existing voucher number through an edit — this is
+      // built fresh from the form, not via copyWith, so without this the
+      // in-memory record (and anyone viewing its voucher right after
+      // saving the edit) would show "EXP-PENDING" until the next full
+      // reload quietly fixed it.
+      voucherNo: editingExpense.value?.voucherNo,
       date: date,
       category: resolvedCategory,
       amount: amount,
@@ -291,14 +310,24 @@ class ExpenseController extends GetxController {
 
       debugPrint('[DEBUG] addExpense: repository.addExpense() completed without throwing');
 
-      expenses.add(savedExpense);
+      // Reload from Supabase rather than just appending the local copy —
+      // `savedExpense` never carries `voucherNo` (that's assigned by
+      // Postgres itself on insert, see receipt_voucher_numbers.sql), so
+      // the voucher PDF shown right after saving — the most common time
+      // it's ever printed — would show "EXP-PENDING" instead of the real
+      // number if returned as-is.
+      await loadExpenses(notifyOnFailure: false);
 
       clearForm();
 
-      return savedExpense;
+      final reloaded =
+          expenses.firstWhereOrNull((e) => e.id == savedExpense.id);
+
+      return reloaded ?? savedExpense;
     } catch (e, stackTrace) {
       debugPrint('[DEBUG] addExpense failed: $e');
       debugPrint('[DEBUG] stackTrace: $stackTrace');
+      AppErrorLogger.log('ExpenseController.addExpense', e, stackTrace);
       return null;
     } finally {
       isSaving.value = false;
@@ -336,7 +365,8 @@ class ExpenseController extends GetxController {
       clearForm();
 
       return true;
-    } catch (e) {
+    } catch (e, stackTrace) {
+      AppErrorLogger.log('ExpenseController.updateExpense', e, stackTrace);
       return false;
     } finally {
       isSaving.value = false;
@@ -370,7 +400,8 @@ class ExpenseController extends GetxController {
       );
 
       return true;
-    } catch (e) {
+    } catch (e, stackTrace) {
+      AppErrorLogger.log('ExpenseController.deleteExpense', e, stackTrace);
       return false;
     } finally {
       isLoading.value = false;

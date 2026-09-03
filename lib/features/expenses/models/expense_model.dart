@@ -11,6 +11,18 @@ double _parseDouble(Object? value) {
   throw FormatException('Expected a number for an expense amount, got: $value');
 }
 
+// Same PostgREST string-vs-number quirk as above, but for the bigint
+// `voucher_no` column (see the migration in receipt_voucher_numbers.sql).
+// Nullable so an expense read before that column existed still displays
+// something sane instead of crashing — see ExpenseVoucherGenerator's
+// fallback.
+int? _parseNullableInt(Object? value) {
+  if (value == null) return null;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value);
+  return null;
+}
+
 // =============================================================================
 // EXPENSE PAYMENT MODE
 // =============================================================================
@@ -83,6 +95,12 @@ const List<String> kExpenseCategories = [
 class ExpenseModel {
   final String? id;
 
+  /// Short, human-friendly sequential number for display on the voucher
+  /// PDF (e.g. "EXP-0001") — NOT the primary key. Assigned automatically
+  /// by Postgres on insert (see receipt_voucher_numbers.sql); null only
+  /// for an expense whose row hasn't been read back with this column yet.
+  final int? voucherNo;
+
   final DateTime date;
 
   final String category;
@@ -95,6 +113,7 @@ class ExpenseModel {
 
   const ExpenseModel({
     this.id,
+    this.voucherNo,
     required this.date,
     required this.category,
     required this.amount,
@@ -116,6 +135,9 @@ class ExpenseModel {
   }) {
     return ExpenseModel(
       id: id ?? this.id,
+      // voucherNo is assigned by the database, never by the app — always
+      // carried over from `this`, not something a caller can overwrite.
+      voucherNo: voucherNo,
       date: date ?? this.date,
       category: category ?? this.category,
       amount: amount ?? this.amount,
@@ -152,6 +174,7 @@ class ExpenseModel {
   ) {
     return ExpenseModel(
       id: map['id'] as String?,
+      voucherNo: _parseNullableInt(map['voucher_no']),
       date: DateTime.parse(
         map['date'] as String,
       ),
@@ -176,6 +199,7 @@ class ExpenseModel {
 
     return other is ExpenseModel &&
         other.id == id &&
+        other.voucherNo == voucherNo &&
         other.date == date &&
         other.category == category &&
         other.amount == amount &&
@@ -187,6 +211,7 @@ class ExpenseModel {
   int get hashCode {
     return Object.hash(
       id,
+      voucherNo,
       date,
       category,
       amount,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../core/logging/app_error_logger.dart';
 import '../../../../core/realtime/realtime_table_sync.dart';
 import '../../../students/data/models/student_model.dart';
 import '../../../students/presentation/controllers/student_controller.dart';
@@ -138,6 +139,8 @@ class ReceiptController extends GetxController {
       // error — whatever receipts were already loaded just stay as-is.
       debugPrint('[RECEIPTS] loadReceipts failed: $e');
       debugPrint('$stackTrace');
+      AppErrorLogger.log('ReceiptController.loadReceipts', e, stackTrace);
+      AppErrorLogger.notifyLoadFailure('Student Cash receipts');
     } finally {
       isLoading.value = false;
     }
@@ -299,6 +302,7 @@ class ReceiptController extends GetxController {
     } catch (e, stackTrace) {
       debugPrint('[RECEIPTS] addReceipt failed: $e');
       debugPrint('$stackTrace');
+      AppErrorLogger.log('ReceiptController.addReceipt', e, stackTrace);
       return null;
     } finally {
       isSaving.value = false;
@@ -332,7 +336,8 @@ class ReceiptController extends GetxController {
       clearForm();
 
       return true;
-    } catch (e) {
+    } catch (e, stackTrace) {
+      AppErrorLogger.log('ReceiptController.updateReceipt', e, stackTrace);
       return false;
     } finally {
       isSaving.value = false;
@@ -358,7 +363,8 @@ class ReceiptController extends GetxController {
       receipts.removeWhere((receipt) => receipt.id == receiptId);
 
       return true;
-    } catch (e) {
+    } catch (e, stackTrace) {
+      AppErrorLogger.log('ReceiptController.deleteReceipt', e, stackTrace);
       return false;
     } finally {
       isLoading.value = false;

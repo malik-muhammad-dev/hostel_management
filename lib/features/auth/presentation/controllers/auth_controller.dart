@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../core/logging/app_error_logger.dart';
 import '../../data/models/app_user_model.dart';
 import '../../data/repositories/auth_repository.dart';
 
@@ -84,8 +85,13 @@ class AuthController extends GetxController {
         'fee collector: $_defaultFeeCollectorUsername / $_defaultFeeCollectorPassword '
         '(change both before handing the app to the client).',
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('[DEBUG] bootstrapDefaultAdmin failed: $e');
+      AppErrorLogger.log(
+        'AuthController.bootstrapDefaultAdmin',
+        e,
+        stackTrace,
+      );
     }
   }
 
@@ -112,8 +118,9 @@ class AuthController extends GetxController {
 
       currentUser.value = user;
       return null;
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('[DEBUG] login failed: $e');
+      AppErrorLogger.log('AuthController.login', e, stackTrace);
       return 'Something went wrong. Please try again.';
     } finally {
       isLoading.value = false;

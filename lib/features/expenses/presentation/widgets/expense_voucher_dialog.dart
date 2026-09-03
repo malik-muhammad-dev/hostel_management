@@ -73,12 +73,22 @@ class ExpenseVoucherDialog extends StatelessWidget {
                 canChangePageFormat: false,
                 canChangeOrientation: false,
                 canDebug: false,
-                pdfFileName: 'Voucher_EXP-${expense.id ?? 'draft'}.pdf',
+                pdfFileName: '${_fileNameLabel(expense)}.pdf',
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  // Matches the "Voucher No." shown inside the PDF itself
+  // (ExpenseVoucherGenerator) rather than the raw UUID, so a saved file's
+  // name is something the client can actually read out.
+  String _fileNameLabel(ExpenseModel expense) {
+    if (expense.voucherNo != null) {
+      return 'Voucher_EXP-${expense.voucherNo.toString().padLeft(4, '0')}';
+    }
+    return expense.id == null ? 'Voucher_draft' : 'Voucher_EXP-PENDING';
   }
 }

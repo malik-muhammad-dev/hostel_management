@@ -94,6 +94,7 @@ class DataExportService {
 
   static const _feePaymentColumns = [
     'id',
+    'receipt_no',
     'student_id',
     'fee_month',
     'current_month_fee',
@@ -109,6 +110,7 @@ class DataExportService {
 
   static const _expenseColumns = [
     'id',
+    'voucher_no',
     'date',
     'category',
     'amount',
@@ -154,7 +156,12 @@ class DataExportService {
       excel,
       'Fee Payments',
       _feePaymentColumns,
-      feePayments.map((pay) => pay.toMap()).toList(),
+      // toMap() deliberately excludes receipt_no (it's assigned by
+      // Postgres on insert, never written by the app — see
+      // receipt_voucher_numbers.sql), so it's merged in here instead.
+      feePayments
+          .map((pay) => {...pay.toMap(), 'receipt_no': pay.receiptNo})
+          .toList(),
     );
 
     final expenses = await expenseRepository.getExpenses();
@@ -162,7 +169,10 @@ class DataExportService {
       excel,
       'Expenses',
       _expenseColumns,
-      expenses.map((e) => e.toMap()).toList(),
+      // Same reasoning as receipt_no above, for voucher_no.
+      expenses
+          .map((e) => {...e.toMap(), 'voucher_no': e.voucherNo})
+          .toList(),
     );
 
     final receipts = await receiptRepository.getReceipts();

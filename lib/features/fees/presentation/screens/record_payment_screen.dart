@@ -101,6 +101,21 @@ class RecordPaymentScreen extends StatelessWidget {
               final justCreatedPayment = await feeController.submitPayment();
 
               if (justCreatedPayment == null) {
+                // Validation already passed above, so a null result here
+                // means the save itself failed (network drop, Supabase
+                // unreachable, etc.) — before this there was NO feedback
+                // at all in that case: the form just sat there with no
+                // error and no visible sign the payment was never
+                // actually recorded. The form is deliberately left as-is
+                // (not reset, dialog stays open) so nothing typed is
+                // lost and the same submit button can be pressed again.
+                Get.snackbar(
+                  'Payment Not Saved',
+                  "Couldn't record this payment — check your internet "
+                      'connection and try again.',
+                  snackPosition: SnackPosition.BOTTOM,
+                  duration: const Duration(seconds: 5),
+                );
                 return;
               }
 

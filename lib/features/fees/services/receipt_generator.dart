@@ -87,7 +87,7 @@ class ReceiptGenerator {
     return pw.Row(
       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
       children: [
-        _metaLine('Receipt No.', 'RCPT-${payment.id ?? '-'}'),
+        _metaLine('Receipt No.', _receiptNoLabel(payment.receiptNo)),
         _metaLine('Date', payment.paymentDate),
       ],
     );
@@ -259,6 +259,15 @@ class ReceiptGenerator {
   // ---------------------------------------------------------------------------
   // Formatting helpers
   // ---------------------------------------------------------------------------
+
+  // Falls back to the old raw-ID label only for a payment somehow read
+  // without receipt_no (e.g. the very moment before the SQL migration in
+  // receipt_voucher_numbers.sql has been run) — every payment recorded
+  // after that migration always has a number.
+  static String _receiptNoLabel(int? receiptNo) {
+    if (receiptNo == null) return 'RCPT-PENDING';
+    return 'RCPT-${receiptNo.toString().padLeft(4, '0')}';
+  }
 
   static String _amount(double amount) {
     final formatted = amount

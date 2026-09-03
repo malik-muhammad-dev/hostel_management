@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../core/logging/app_error_logger.dart';
 import '../../../../core/realtime/realtime_table_sync.dart';
 import '../../../students/presentation/controllers/student_controller.dart';
 import '../../../students/presentation/controllers/student_service_controller.dart';
@@ -153,7 +154,17 @@ class FeeController extends GetxController {
   // DATA LOADING
   // ===========================================================================
 
-  Future<void> loadFeeData() async {
+  // [notifyOnFailure] is false when this is called right after this
+  // controller's own successful write (submitPayment/addPayment/
+  // addTransaction all reload immediately afterward, just to pick up
+  // DB-assigned values like receipt_no). A transient failure on THAT
+  // specific reload must not show "Couldn't load Fees" — the money was
+  // already recorded successfully; a scary snackbar right after a
+  // successful save would look like the save itself failed and risks
+  // staff re-entering the same payment as a duplicate. The initial
+  // load (onInit) and the realtime-sync-triggered reload both keep the
+  // default of true, since those genuinely are "couldn't load" cases.
+  Future<void> loadFeeData({bool notifyOnFailure = true}) async {
     try {
       isLoading.value = true;
 
@@ -195,6 +206,10 @@ await loadStudentServiceAmounts();
       // fee data was already loaded just stays as it is.
       debugPrint('[DEBUG] loadFeeData failed: $e');
       debugPrint('[DEBUG] stackTrace: $stackTrace');
+      AppErrorLogger.log('FeeController.loadFeeData', e, stackTrace);
+      if (notifyOnFailure) {
+        AppErrorLogger.notifyLoadFailure('Fees');
+      }
     } finally {
       isLoading.value = false;
     }
@@ -941,6 +956,7 @@ return baseFee + serviceAmount;}
       // uncaught mid-payment.
       debugPrint('[DEBUG] submitPayment failed: $e');
       debugPrint('[DEBUG] stackTrace: $stackTrace');
+      AppErrorLogger.log('FeeController.submitPayment', e, stackTrace);
       return null;
     }
   }
@@ -1031,23 +1047,31 @@ return baseFee + serviceAmount;}
       paymentTransaction: paymentTransaction,
     );
 
-    await loadFeeData();
+    await loadFeeData(notifyOnFailure: false);
 
-    return payment;
+    // The `payment` object above is the pre-insert local copy — it never
+    // carries `receiptNo` (that's assigned by Postgres itself on insert,
+    // see receipt_voucher_numbers.sql). loadFeeData() just re-fetched
+    // every payment fresh from Supabase, receipt number included, so
+    // hand back THAT copy — otherwise the receipt PDF shown right after
+    // recording a payment (the most common time it's ever printed) would
+    // show "RCPT-PENDING" instead of the real number. Falls back to the
+    // local copy only if the reload somehow doesn't contain it yet.
+    return payments.firstWhereOrNull((p) => p.id == payment.id) ?? payment;
   }
 
   Future<void> addPayment(
     FeePayment payment,
   ) async {
     await repository.addPayment(payment);
-    await loadFeeData();
+    await loadFeeData(notifyOnFailure: false);
   }
 
   Future<void> addTransaction(
     FeeTransaction transaction,
   ) async {
     await repository.addTransaction(transaction);
-    await loadFeeData();
+    await loadFeeData(notifyOnFailure: false);
   }
   // ===========================================================================
   // Load Student Services 

@@ -136,7 +136,18 @@ class ExpenseRecordsTable extends StatelessWidget {
       return;
     }
 
-    await controller.deleteExpense(expenseId);
+    final success = await controller.deleteExpense(expenseId);
+
+    // Previously fire-and-forget — a failed delete (network drop, etc.)
+    // looked identical to a successful one, since the row just silently
+    // stayed put with nothing telling the person why.
+    if (!success) {
+      Get.snackbar(
+        'Error',
+        'Unable to delete that expense. Please try again.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
   }
 }
 

@@ -298,7 +298,18 @@ class _ReceiptsTable extends StatelessWidget {
       return;
     }
 
-    await controller.deleteReceipt(receiptId);
+    final success = await controller.deleteReceipt(receiptId);
+
+    // Previously fire-and-forget — a failed delete (network drop, etc.)
+    // looked identical to a successful one, since the row just silently
+    // stayed put with nothing telling the person why.
+    if (!success) {
+      Get.snackbar(
+        'Error',
+        'Unable to delete that receipt. Please try again.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+    }
   }
 }
 

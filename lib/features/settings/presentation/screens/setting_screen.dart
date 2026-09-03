@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:hostel_management/app/theme/app_colors.dart';
+import 'package:hostel_management/core/logging/app_error_logger.dart';
 import 'package:hostel_management/features/settings/presentation/controllers/app_settings_controller.dart';
 import 'package:hostel_management/features/settings/services/data_export_service.dart';
 import 'package:hostel_management/features/students/data/repositories/student_repository.dart';
@@ -126,7 +127,9 @@ class _ExportDataCardState extends State<_ExportDataCard> {
         'Saved to $path',
         snackPosition: SnackPosition.BOTTOM,
       );
-    } catch (e) {
+    } catch (e, stackTrace) {
+      AppErrorLogger.log('SettingScreen._runExport', e, stackTrace);
+
       if (mounted) {
         Get.snackbar(
           'Export Failed',

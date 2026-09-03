@@ -74,7 +74,7 @@ class ExpenseVoucherGenerator {
     return pw.Row(
       mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
       children: [
-        _metaLine('Voucher No.', 'EXP-${expense.id ?? '-'}'),
+        _metaLine('Voucher No.', _voucherNoLabel(expense.voucherNo)),
         _metaLine('Date', _formatDate(expense.date)),
       ],
     );
@@ -182,5 +182,14 @@ class ExpenseVoucherGenerator {
     return '${date.year.toString().padLeft(4, '0')}-'
         '${date.month.toString().padLeft(2, '0')}-'
         '${date.day.toString().padLeft(2, '0')}';
+  }
+
+  // Falls back to the old raw-ID label only for an expense somehow read
+  // without voucher_no (e.g. the very moment before the SQL migration in
+  // receipt_voucher_numbers.sql has been run) — every expense recorded
+  // after that migration always has a number.
+  static String _voucherNoLabel(int? voucherNo) {
+    if (voucherNo == null) return 'EXP-PENDING';
+    return 'EXP-${voucherNo.toString().padLeft(4, '0')}';
   }
 }

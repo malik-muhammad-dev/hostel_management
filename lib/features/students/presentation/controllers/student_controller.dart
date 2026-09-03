@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/logging/app_error_logger.dart';
 import '../../../../core/realtime/realtime_table_sync.dart';
 import '../../data/models/student_model.dart';
 import '../../data/repositories/student_repository.dart';
@@ -117,6 +118,8 @@ class StudentController extends GetxController {
       // whatever students were already loaded just stay as they are.
       debugPrint('[DEBUG] loadStudents failed: $e');
       debugPrint('[DEBUG] stackTrace: $stackTrace');
+      AppErrorLogger.log('StudentController.loadStudents', e, stackTrace);
+      AppErrorLogger.notifyLoadFailure('Students');
     } finally {
       isLoading.value = false;
     }
@@ -144,6 +147,7 @@ class StudentController extends GetxController {
     } catch (e, stackTrace) {
       debugPrint('[DEBUG] addStudent failed: $e');
       debugPrint('[DEBUG] stackTrace: $stackTrace');
+      AppErrorLogger.log('StudentController.addStudent', e, stackTrace);
       return null;
     } finally {
       isLoading.value = false;
@@ -188,6 +192,7 @@ class StudentController extends GetxController {
       // of throwing an uncaught exception up into the UI.
       debugPrint('[DEBUG] updateStudent failed: $e');
       debugPrint('[DEBUG] stackTrace: $stackTrace');
+      AppErrorLogger.log('StudentController.updateStudent', e, stackTrace);
       return false;
     } finally {
       isLoading.value = false;
@@ -216,8 +221,9 @@ class StudentController extends GetxController {
       await loadStudents();
 
       return true;
-    } catch (e) {
+    } catch (e, stackTrace) {
       debugPrint('[DEBUG] archiveStudent failed: $e');
+      AppErrorLogger.log('StudentController.archiveStudent', e, stackTrace);
       return false;
     } finally {
       isLoading.value = false;
