@@ -1,6 +1,6 @@
 import 'package:get/get.dart';
 import 'package:hostel_management/features/auth/data/datasource/auth_data_source.dart';
-import 'package:hostel_management/features/auth/data/datasource/sqlite_auth_datasource.dart';
+import 'package:hostel_management/features/auth/data/datasource/supabase_auth_datasource.dart';
 
 import 'package:hostel_management/features/auth/data/repositories/auth_repository.dart';
 import 'package:hostel_management/features/auth/presentation/controllers/auth_controller.dart';
@@ -54,7 +54,7 @@ class AppBinding extends Bindings {
     // Auth
     // -------------------------------------------------------------------------
 
-    Get.lazyPut<AuthDataSource>(() => SqliteAuthDataSource(), fenix: true);
+    Get.lazyPut<AuthDataSource>(() => SupabaseAuthDataSource(), fenix: true);
 
     Get.lazyPut<AuthRepository>(
       () => AuthRepository(Get.find<AuthDataSource>()),
