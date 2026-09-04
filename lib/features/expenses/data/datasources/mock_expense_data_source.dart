@@ -10,6 +10,17 @@ class MockExpenseDataSource implements ExpenseDataSource {
   }
 
   @override
+  Future<ExpenseModel?> getExpenseById(String id) async {
+    for (final expense in _expenses) {
+      if (expense.id == id) {
+        return expense;
+      }
+    }
+
+    return null;
+  }
+
+  @override
   Future<void> addExpense(
     ExpenseModel expense,
   ) async {

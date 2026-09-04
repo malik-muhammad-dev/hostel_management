@@ -7,6 +7,13 @@ abstract class FeeDataSource {
 
   Future<List<FeePayment>> getPayments();
 
+  /// A single payment by its primary key — used right after recording a
+  /// payment to pick up fields the app doesn't set itself (`receiptNo`,
+  /// assigned by the database on insert) without re-fetching every
+  /// payment/transaction/summary just for that one row. Returns null if
+  /// no such payment exists (or it's been soft-deleted).
+  Future<FeePayment?> getPaymentById(String id);
+
   Future<List<StudentFeeSummary>> getStudentFeeSummaries();
 
   Future<StudentFeeSummary?> getStudentFeeSummary(String studentId);

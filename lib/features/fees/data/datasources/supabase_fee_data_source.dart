@@ -65,6 +65,22 @@ class SupabaseFeeDataSource implements FeeDataSource {
   }
 
   @override
+  Future<FeePayment?> getPaymentById(String id) async {
+    // A lookup by primary key — Postgres serves this off the table's own
+    // index, so it stays fast no matter how many payments have piled up
+    // over time, unlike getPayments() above which fetches everything.
+    final rows = await _client
+        .from('fee_payments')
+        .select()
+        .eq('id', id)
+        .isFilter('deleted_at', null)
+        .limit(1);
+
+    if (rows.isEmpty) return null;
+    return FeePayment.fromMap(Map<String, Object?>.from(rows.first));
+  }
+
+  @override
   Future<List<StudentFeeSummary>> getStudentFeeSummaries() async {
     final transactions = await getTransactions();
     return _summarize(transactions).values.toList();

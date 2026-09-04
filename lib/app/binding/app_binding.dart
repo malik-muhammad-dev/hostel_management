@@ -11,7 +11,7 @@ import 'package:hostel_management/features/expenses/presentation/controllers/exp
 import 'package:hostel_management/features/reports/presentation/controllers/fee_collection_report_controller.dart';
 import 'package:hostel_management/features/reports/presentation/controllers/report_controller.dart';
 import 'package:hostel_management/features/dashboard/presentation/controllers/dashboard_controller.dart';
-import 'package:hostel_management/features/students/data/datasources/sqlite_student_service_data_source.dart';
+import 'package:hostel_management/features/students/data/datasources/supabase_student_service_data_source.dart';
 import 'package:hostel_management/features/students/data/datasources/supabase_student_data_source.dart';
 import 'package:hostel_management/features/students/data/datasources/sqlite_student_documnet_data_source.dart';
 import 'package:hostel_management/features/students/data/datasources/student_service_datasource.dart' show StudentServiceDataSource;
@@ -23,7 +23,7 @@ import 'package:hostel_management/features/students/data/repositories/student_do
 import 'package:hostel_management/features/students/presentation/controllers/student_document_controller.dart';
 
 import 'package:hostel_management/features/settings/data/datasource/app_settings_data_source.dart' show AppSettingsDataSource;
-import 'package:hostel_management/features/settings/data/datasource/sqlite_app_settings_data_source.dart' show SqliteAppSettingsDataSource;
+import 'package:hostel_management/features/settings/data/datasource/supabase_app_settings_data_source.dart' show SupabaseAppSettingsDataSource;
 import 'package:hostel_management/features/settings/data/repositories/app_settings_repository.dart' show AppSettingsRepository;
 import 'package:hostel_management/features/settings/presentation/controllers/app_settings_controller.dart' show AppSettingsController;
 
@@ -69,11 +69,15 @@ class AppBinding extends Bindings {
     // -------------------------------------------------------------------------
     // Student data layer
     //
-    // Milestone 4, Step 1: Students is the first feature swapped from
+    // Milestone 4, Step 1: Students was the first feature swapped from
     // local SQLite to Supabase, per the migration design spec's delivery
-    // order. Every other feature below is still SqliteXDataSource for
-    // now — swapped one at a time, each one tested end-to-end before
-    // the next.
+    // order — swapped one at a time, each one tested end-to-end before
+    // the next. Student Services and App Settings' money fields
+    // (Opening Balance, Late Fine rule) were migrated later, in a
+    // separate pass — see their own Get.lazyPut blocks below. Student
+    // Documents still needs its own cloud file storage work and remains
+    // on local SQLite for now; App Settings' Backup Folder Path/Last
+    // Backup At are local on purpose (see supabase_app_settings_data_source.dart).
     // -------------------------------------------------------------------------
 
     Get.lazyPut<StudentDataSource>(
@@ -91,7 +95,7 @@ class AppBinding extends Bindings {
 // ---------------------------------------------------------------------------
 
 Get.lazyPut<StudentServiceDataSource>(
-  () => SqliteStudentServiceDataSource(),
+  () => SupabaseStudentServiceDataSource(),
   fenix: true,
 );
 
@@ -212,7 +216,7 @@ Get.lazyPut<DashboardController>(
 // ---------------------------------------------------------------------------
 
 Get.lazyPut<AppSettingsDataSource>(
-  () => SqliteAppSettingsDataSource(),
+  () => SupabaseAppSettingsDataSource(),
   fenix: true,
 );
 

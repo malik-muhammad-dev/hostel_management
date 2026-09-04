@@ -1047,17 +1047,61 @@ return baseFee + serviceAmount;}
       paymentTransaction: paymentTransaction,
     );
 
-    await loadFeeData(notifyOnFailure: false);
+    // The payment is already safely recorded at this point — everything
+    // below is just cosmetic follow-up (picking up the DB-assigned
+    // receipt number, refreshing the rest of the screen). None of it is
+    // allowed to turn a successful save into an apparent failure, so
+    // it's deliberately isolated in its own try/catch rather than
+    // sharing the one around this whole method: if this fails (e.g. the
+    // network drops in the instant after the write went through), the
+    // caller must still see the payment as saved — just with the
+    // receipt PDF falling back to "RCPT-PENDING" instead of the real
+    // number, not an "unable to save" message for money that was, in
+    // fact, saved.
+    FeePayment? freshPayment;
 
-    // The `payment` object above is the pre-insert local copy — it never
-    // carries `receiptNo` (that's assigned by Postgres itself on insert,
-    // see receipt_voucher_numbers.sql). loadFeeData() just re-fetched
-    // every payment fresh from Supabase, receipt number included, so
-    // hand back THAT copy — otherwise the receipt PDF shown right after
-    // recording a payment (the most common time it's ever printed) would
-    // show "RCPT-PENDING" instead of the real number. Falls back to the
-    // local copy only if the reload somehow doesn't contain it yet.
-    return payments.firstWhereOrNull((p) => p.id == payment.id) ?? payment;
+    try {
+      // `payment` above is the pre-insert local copy — it never carries
+      // `receiptNo` (that's assigned by Postgres itself on insert, see
+      // receipt_voucher_numbers.sql), so the receipt PDF shown right
+      // after recording a payment (the most common time it's ever
+      // printed) needs the real, saved row back. This USED to call the
+      // full loadFeeData() (every transaction, every payment, every
+      // student's summary, service amounts — everything) just to learn
+      // one row's number, which is why saving a payment felt slow.
+      // Fetching that one row by id uses the same index Postgres
+      // already has on the primary key — fast regardless of how much
+      // data the hostel has accumulated.
+      freshPayment = await repository.getPaymentById(payment.id!);
+
+      if (freshPayment != null) {
+        final index = payments.indexWhere((p) => p.id == freshPayment!.id);
+        if (index == -1) {
+          payments.add(freshPayment);
+        } else {
+          payments[index] = freshPayment;
+        }
+      }
+    } catch (e, stackTrace) {
+      AppErrorLogger.log(
+        'FeeController._submitPaymentUnsafe (post-save fetch)',
+        e,
+        stackTrace,
+      );
+    }
+
+    // The rest of the screen (transactions, student summaries, service
+    // amounts) still needs refreshing — deliberately NOT awaited, so the
+    // receipt shows immediately instead of waiting on it. Realtime sync
+    // (RealtimeTableSync on fee_transactions/fee_payments) would pick
+    // this up on its own shortly anyway; this just isn't worth making
+    // the person who just took a payment sit and wait for. loadFeeData()
+    // handles its own errors internally, so nothing further to guard
+    // here.
+    // ignore: unawaited_futures
+    loadFeeData(notifyOnFailure: false);
+
+    return freshPayment ?? payment;
   }
 
   Future<void> addPayment(

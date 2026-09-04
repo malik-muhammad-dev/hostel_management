@@ -51,6 +51,20 @@ class SqliteFeeDataSource implements FeeDataSource {
   }
 
   @override
+  Future<FeePayment?> getPaymentById(String id) async {
+    final db = await _db;
+    final rows = await db.query(
+      'fee_payments',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+
+    if (rows.isEmpty) return null;
+    return FeePayment.fromMap(rows.first);
+  }
+
+  @override
   Future<List<StudentFeeSummary>> getStudentFeeSummaries() async {
     final db = await _db;
 

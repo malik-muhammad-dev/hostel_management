@@ -241,6 +241,17 @@ class MockFeeDataSource implements FeeDataSource {
   }
 
   @override
+  Future<FeePayment?> getPaymentById(String id) async {
+    for (final payment in _payments) {
+      if (payment.id == id) {
+        return payment;
+      }
+    }
+
+    return null;
+  }
+
+  @override
   Future<List<StudentFeeSummary>> getStudentFeeSummaries() async {
     return List.unmodifiable(_summaries);
   }

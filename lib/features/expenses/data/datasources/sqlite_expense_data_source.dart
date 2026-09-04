@@ -19,6 +19,20 @@ class SqliteExpenseDataSource implements ExpenseDataSource {
   }
 
   @override
+  Future<ExpenseModel?> getExpenseById(String id) async {
+    final db = await _db;
+    final rows = await db.query(
+      'expenses',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+
+    if (rows.isEmpty) return null;
+    return ExpenseModel.fromMap(rows.first);
+  }
+
+  @override
   Future<void> addExpense(ExpenseModel expense) async {
     final db = await _db;
     await db.insert(

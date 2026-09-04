@@ -12,6 +12,10 @@ class ExpenseRepository {
     return dataSource.getExpenses();
   }
 
+  Future<ExpenseModel?> getExpenseById(String id) {
+    return dataSource.getExpenseById(id);
+  }
+
   Future<void> addExpense(
     ExpenseModel expense,
   ) {

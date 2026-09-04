@@ -310,20 +310,48 @@ class ExpenseController extends GetxController {
 
       debugPrint('[DEBUG] addExpense: repository.addExpense() completed without throwing');
 
-      // Reload from Supabase rather than just appending the local copy —
-      // `savedExpense` never carries `voucherNo` (that's assigned by
-      // Postgres itself on insert, see receipt_voucher_numbers.sql), so
-      // the voucher PDF shown right after saving — the most common time
-      // it's ever printed — would show "EXP-PENDING" instead of the real
-      // number if returned as-is.
-      await loadExpenses(notifyOnFailure: false);
+      // The expense is already safely saved at this point — everything
+      // below is cosmetic follow-up (picking up the DB-assigned voucher
+      // number). It must not be allowed to turn a successful save into
+      // an apparent failure, so it's isolated in its own try/catch
+      // rather than sharing the one around this whole method: if this
+      // fails (e.g. the network drops right after the write went
+      // through), the caller must still see the expense as saved — just
+      // with the voucher PDF falling back to "EXP-PENDING" instead of
+      // the real number, not "Unable to save expense" for money that
+      // was, in fact, saved.
+      ExpenseModel? freshExpense;
+
+      try {
+        // `savedExpense` never carries `voucherNo` (that's assigned by
+        // Postgres itself on insert, see receipt_voucher_numbers.sql),
+        // so the voucher PDF shown right after saving — the most common
+        // time it's ever printed — needs the real, saved row back. This
+        // used to reload the ENTIRE expenses list just to learn one
+        // row's number, which is why saving felt slow. Fetching that
+        // one row by id uses the table's own primary-key index instead
+        // — fast no matter how many expenses have piled up.
+        freshExpense = await repository.getExpenseById(savedExpense.id!);
+
+        if (freshExpense != null) {
+          final index = expenses.indexWhere((e) => e.id == freshExpense!.id);
+          if (index == -1) {
+            expenses.add(freshExpense);
+          } else {
+            expenses[index] = freshExpense;
+          }
+        }
+      } catch (e, stackTrace) {
+        AppErrorLogger.log(
+          'ExpenseController.addExpense (post-save fetch)',
+          e,
+          stackTrace,
+        );
+      }
 
       clearForm();
 
-      final reloaded =
-          expenses.firstWhereOrNull((e) => e.id == savedExpense.id);
-
-      return reloaded ?? savedExpense;
+      return freshExpense ?? savedExpense;
     } catch (e, stackTrace) {
       debugPrint('[DEBUG] addExpense failed: $e');
       debugPrint('[DEBUG] stackTrace: $stackTrace');

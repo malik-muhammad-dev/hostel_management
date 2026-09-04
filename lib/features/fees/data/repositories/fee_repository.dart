@@ -16,6 +16,10 @@ class FeeRepository {
     return dataSource.getPayments();
   }
 
+  Future<FeePayment?> getPaymentById(String id) {
+    return dataSource.getPaymentById(id);
+  }
+
   Future<List<StudentFeeSummary>> getStudentFeeSummaries() {
     return dataSource.getStudentFeeSummaries();
   }

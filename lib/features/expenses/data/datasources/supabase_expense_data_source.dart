@@ -40,6 +40,22 @@ class SupabaseExpenseDataSource implements ExpenseDataSource {
   }
 
   @override
+  Future<ExpenseModel?> getExpenseById(String id) async {
+    // A lookup by primary key — Postgres serves this off the table's own
+    // index, so it stays fast regardless of how many expenses have piled
+    // up, unlike getExpenses() above which fetches everything.
+    final rows = await _client
+        .from('expenses')
+        .select()
+        .eq('id', id)
+        .isFilter('deleted_at', null)
+        .limit(1);
+
+    if (rows.isEmpty) return null;
+    return ExpenseModel.fromMap(Map<String, Object?>.from(rows.first));
+  }
+
+  @override
   Future<void> addExpense(ExpenseModel expense) async {
     final nowIso = DateTime.now().toUtc().toIso8601String();
     final map = expense.toMap()
