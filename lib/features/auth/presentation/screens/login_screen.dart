@@ -46,9 +46,17 @@ class _LoginScreenState extends State<LoginScreen> {
 
           return Row(
             children: [
-              if (showHeroPanel) const Expanded(child: _HeroPanel()),
+              // Was Expanded(child: _HeroPanel()) with no flex — that
+              // defaults to flex:1 against the form panel's flex:4 below,
+              // so the branding panel only ever got 1/5 of the window's
+              // width. Its own content (the 340px-wide description box,
+              // plus the "Obaid Noor Institute..." credit line) needs
+              // more room than that on any normal window size, so it was
+              // getting cut off at the panel's right edge instead of
+              // showing in full. Rebalanced to a roughly even split.
+              if (showHeroPanel) const Expanded(flex: 5, child: _HeroPanel()),
               Expanded(
-                flex: showHeroPanel ? 4 : 1,
+                flex: showHeroPanel ? 6 : 1,
                 child: _FormPanel(
                   usernameController: _usernameController,
                   passwordController: _passwordController,
@@ -177,7 +185,15 @@ class _HeroPanel extends StatelessWidget {
                         const SizedBox(height: 24),
 
                         SizedBox(
-                          width: 340,
+                          // Was a hard-coded 340 — wider than the panel
+                          // itself could ever get before the flex-ratio
+                          // fix above, and still worth guarding: this
+                          // caps at 340 on a roomy window but never asks
+                          // for more than the panel actually has, so it
+                          // can't overflow the panel's right edge again.
+                          width: constraints.maxWidth < 340
+                              ? constraints.maxWidth
+                              : 340,
                           child: Text(
                             'A single, secure record for every student\'s stay — '
                             'admissions, fees, and daily hostel operations in one place.',
@@ -198,9 +214,19 @@ class _HeroPanel extends StatelessWidget {
 
           Positioned(
             left: 56,
+            right: 16,
             bottom: 40,
+            // Previously had no `right`, so this had no width limit at
+            // all — on the narrow panel this used to render as (before
+            // the flex fix above) it ran straight past the panel's own
+            // right edge and got clipped there, instead of wrapping.
+            // Anchoring both sides means it now wraps to a second line
+            // if the panel is ever narrow again, rather than disappearing
+            // off the edge.
             child: Text(
               'Obaid Noor Institute of Medical & Science',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
