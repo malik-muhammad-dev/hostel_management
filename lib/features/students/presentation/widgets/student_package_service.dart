@@ -175,6 +175,15 @@ class _ServicesCard extends StatelessWidget {
                 onPressed: student.id == null
                     ? null
                     : () {
+                        if (student.status == 'Archived') {
+                          Get.snackbar(
+                            'Student Archived',
+                            'This student is archived — new services can\'t be added for them.',
+                            snackPosition: SnackPosition.BOTTOM,
+                          );
+                          return;
+                        }
+
                         _showAddServiceDialog(
                           context,
                           serviceController,

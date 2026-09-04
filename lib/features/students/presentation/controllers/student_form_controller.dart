@@ -488,6 +488,21 @@ final selectedPhoto = Rxn<File>();
       return 'Please select a hostel status.';
     }
 
+    // These three show a required (*) on the form but were never
+    // actually checked here — a student could be saved with no
+    // block/room/bed on record at all.
+    if (hostelBlockController.text.trim().isEmpty) {
+      return 'Please enter the hostel block.';
+    }
+
+    if (roomNumberController.text.trim().isEmpty) {
+      return 'Please enter the room number.';
+    }
+
+    if (bedNumberController.text.trim().isEmpty) {
+      return 'Please enter the bed number.';
+    }
+
     if (phoneController.text.trim().isEmpty) {
       return 'Please enter the phone number.';
     }
@@ -580,6 +595,10 @@ if (_parseDate(packageStartDate) == null) {
 
     DateTime? checkInDate;
     DateTime? checkOutDate;
+
+    if (checkInText.isEmpty) {
+      return 'Please enter the check-in date.';
+    }
 
     if (checkInText.isNotEmpty) {
       checkInDate = _parseDate(checkInText);

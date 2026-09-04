@@ -137,21 +137,43 @@ class AppSettingsController extends GetxController {
   //   doing on the live app.
   // ===========================================================================
 
+  // NOTE — auto-backup is deliberately NOT armed here anymore.
+  //
+  // `backupFolderPath` is still loaded/stored because the Settings
+  // screen's "Export Data" feature (the current, correct,
+  // Supabase-reading export) legitimately reuses the same stored folder
+  // path as its remembered destination. But this local SQLite database
+  // has been stale for every Supabase-migrated feature since the
+  // migration — a "backup" of it no longer reflects the client's real
+  // data — and the old "Cloud Backup" card that used to expose/control
+  // this auto-backup timer was intentionally removed from the UI (see
+  // setting_screen.dart's header comment). Before this fix, simply
+  // picking an export folder in the new Export Data card silently
+  // re-armed a 3-hour recurring timer that kept writing increasingly
+  // stale/misleading .db snapshots, with no remaining way to see or turn
+  // it off. `backupNow()`/`_runAutoBackup()`/the Timer machinery below
+  // are kept in place (unreachable, on purpose) rather than deleted, the
+  // same way other confirmed-dead code in this app has been handled.
   Future<void> loadBackupSettings() async {
     backupFolderPath.value = await repository.getBackupFolderPath();
     lastBackupAt.value = await repository.getLastBackupAt();
-    _scheduleAutoBackup();
   }
 
-  /// Called from the Settings screen's folder picker. Passing `null`
-  /// turns the whole feature off — the running timer is cancelled and
-  /// nothing runs again until a folder is set once more.
+  /// Called from the Settings screen's Export Data folder picker to
+  /// remember the chosen destination folder. Does NOT arm the local
+  /// SQLite auto-backup timer — see the note on loadBackupSettings()
+  /// above for why.
   Future<void> setBackupFolderPath(String? path) async {
     await repository.setBackupFolderPath(path);
     backupFolderPath.value = path;
-    _scheduleAutoBackup();
   }
 
+  // Dead code, kept on purpose: nothing calls this anymore now that
+  // loadBackupSettings()/setBackupFolderPath() no longer arm it (see the
+  // note above). Left in place, along with backupNow()/_runAutoBackup()/
+  // the Timer field, rather than deleted, in case auto-backup is ever
+  // reintroduced with a real UI to control it.
+  // ignore: unused_element
   void _scheduleAutoBackup() {
     _autoBackupTimer?.cancel();
     _autoBackupTimer = null;

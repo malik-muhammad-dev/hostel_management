@@ -403,6 +403,15 @@ class _PaymentHistoryCard extends StatelessWidget {
 
               OutlinedButton.icon(
                 onPressed: () {
+                  if (student.status == 'Archived') {
+                    Get.snackbar(
+                      'Student Archived',
+                      'This student is archived — new payments can\'t be recorded for them.',
+                      snackPosition: SnackPosition.BOTTOM,
+                    );
+                    return;
+                  }
+
                   final feeController = Get.find<FeeController>();
 
                   feeController.setPaymentStudent(studentId);
