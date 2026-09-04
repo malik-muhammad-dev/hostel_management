@@ -1,9 +1,11 @@
+import 'package:get/get.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import '../../../core/constants/app_constants.dart';
 import '../../students/data/models/student_model.dart';
 import '../data/models/fee_payment_model.dart';
+import '../presentation/controllers/fee_controller.dart';
 
 // =============================================================================
 // RECEIPT GENERATOR
@@ -26,6 +28,19 @@ class ReceiptGenerator {
   }) async {
     final doc = pw.Document();
 
+    // Total Due / Remaining are computed live from EVERY payment recorded
+    // for this student/month — not just this one row — so a month paid
+    // in two or more installments prints the correct remaining balance
+    // on the 2nd+ receipt instead of re-showing the full month fee as
+    // still owed. See FeeController.totalDueForPayment/
+    // remainingBalanceForPayment for why FeePayment.totalDue/
+    // remainingBalance (its own getters) aren't used here anymore.
+    final feeController = Get.find<FeeController>();
+    final totalDue = feeController.totalDueForPayment(payment);
+    final remainingBalance = feeController.remainingBalanceForPayment(
+      payment,
+    );
+
     doc.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a5,
@@ -42,9 +57,9 @@ class ReceiptGenerator {
               pw.SizedBox(height: 10),
               _studentDetails(student),
               pw.SizedBox(height: 16),
-              _paymentTable(payment),
+              _paymentTable(payment, totalDue),
               pw.SizedBox(height: 18),
-              _amountReceivedBox(payment),
+              _amountReceivedBox(payment, remainingBalance),
               pw.Spacer(),
               pw.Divider(color: PdfColors.grey400),
               pw.SizedBox(height: 6),
@@ -135,7 +150,7 @@ class ReceiptGenerator {
     );
   }
 
-  static pw.Widget _paymentTable(FeePayment payment) {
+  static pw.Widget _paymentTable(FeePayment payment, double totalDue) {
     final rows = <List<String>>[
       ['Fee Month', _formatMonthLabel(payment.feeMonth)],
       ['Current Month Fee', _amount(payment.currentMonthFee)],
@@ -143,7 +158,7 @@ class ReceiptGenerator {
         ['Previous Balance', _amount(payment.previousBalance)],
       if (payment.fine > 0) ['Fine', _amount(payment.fine)],
       if (payment.discount > 0) ['Discount', '- ${_amount(payment.discount)}'],
-      ['Total Due', _amount(payment.totalDue)],
+      ['Total Due', _amount(totalDue)],
     ];
 
     return pw.Table(
@@ -184,7 +199,10 @@ class ReceiptGenerator {
     );
   }
 
-  static pw.Widget _amountReceivedBox(FeePayment payment) {
+  static pw.Widget _amountReceivedBox(
+    FeePayment payment,
+    double remainingBalance,
+  ) {
     return pw.Container(
       width: double.infinity,
       padding: const pw.EdgeInsets.all(12),
@@ -224,7 +242,7 @@ class ReceiptGenerator {
                 style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
               ),
               pw.Text(
-                'Remaining: ${_amount(payment.remainingBalance)}',
+                'Remaining: ${_amount(remainingBalance)}',
                 style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey700),
               ),
             ],

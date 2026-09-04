@@ -45,9 +45,16 @@ class StudentFeePayments extends StatelessWidget {
         (sum, payment) => sum + payment.discount,
       );
 
-      final totalCharges = summary.feeCharged;
+      // summary.feeCharged is already net of every discount ever given
+      // to this student (see FeeController.computeFeeSummary) — it IS
+      // Net Payable already. "Total Charges" (the gross, pre-discount
+      // figure this card also shows) is reconstructed by adding the
+      // discount back, rather than subtracting it a second time here —
+      // that double-subtraction used to make a discounted-but-not-fully-
+      // paid student appear fully "Paid" with Rs. 0 owed.
+      final netPayable = summary.feeCharged;
 
-      final netPayable = totalCharges - totalDiscount;
+      final totalCharges = netPayable + totalDiscount;
 
       final totalPaid = summary.feeSubmitted;
 

@@ -297,6 +297,36 @@ await loadStudentServiceAmounts();
   // calculations can depend on the complete transaction history.
   // ===========================================================================
 
+  // ---------------------------------------------------------------------------
+  // Discount given to a student is recorded on the FeePayment row itself
+  // (FeePayment.discount) — it never reduces a charge transaction's
+  // `debit`, because a discount can be granted on ANY installment of a
+  // month, not only the one that creates the charge. So every summary
+  // below that reports what a student truly owes must separately pull
+  // and subtract the discount total from `payments`, not just sum
+  // `transactions`. Skipping this step used to leave a permanent phantom
+  // balance — exactly the amount of every discount ever given — sitting
+  // on a fully-paid student forever, rolling into next month's
+  // previousBalance and able to trigger a late fine on a student who
+  // paid in full. See computeFeeSummaryForMonth's `charged > 0` branch
+  // below for the month-scoped version of this same fix.
+  // ---------------------------------------------------------------------------
+
+  double _totalDiscountForStudent(String studentId) {
+    return payments
+        .where((payment) => payment.studentId == studentId)
+        .fold<double>(0.0, (sum, payment) => sum + payment.discount);
+  }
+
+  double _totalDiscountForMonth(String studentId, String feeMonth) {
+    return payments
+        .where(
+          (payment) =>
+              payment.studentId == studentId && payment.feeMonth == feeMonth,
+        )
+        .fold<double>(0.0, (sum, payment) => sum + payment.discount);
+  }
+
   StudentFeeSummary computeFeeSummary(String studentId) {
     final studentTransactions = transactions.where(
       (transaction) => transaction.studentId == studentId,
@@ -322,11 +352,17 @@ await loadStudentServiceAmounts();
           (sum, transaction) => sum + transaction.credit,
         );
 
+    // Net of every discount ever given to this student — see the note
+    // above. Without this, a discounted student shows as permanently
+    // owing exactly their discount amount, forever.
+    final netCharged = charged - _totalDiscountForStudent(studentId);
+    final feeCharged = netCharged < 0 ? 0.0 : netCharged;
+
     return StudentFeeSummary(
       studentId: studentId,
-      feeCharged: charged,
+      feeCharged: feeCharged,
       feeSubmitted: submitted,
-      feePending: charged - submitted,
+      feePending: feeCharged - submitted,
     );
   }
 
@@ -373,14 +409,25 @@ await loadStudentServiceAmounts();
   //
   // Never recalculate an already-created month's charge from the student's
   // current services.
+  //
+  // Net of every discount given for THIS month (across every installment
+  // payment recorded for it, not just one) — see _totalDiscountForMonth's
+  // comment above computeFeeSummary. Without this, a discount collected
+  // correctly at payment time still left the ledger thinking the
+  // discounted amount was never paid: it rolled into next month's
+  // previousBalance, and could trigger a late fine on a student who had
+  // actually paid their (discounted) fee in full.
   // -------------------------------------------------------------------------
 
   if (charged > 0) {
+    final netCharged = charged - _totalDiscountForMonth(studentId, feeMonth);
+    final feeCharged = netCharged < 0 ? 0.0 : netCharged;
+
     return StudentFeeSummary(
       studentId: studentId,
-      feeCharged: charged,
+      feeCharged: feeCharged,
       feeSubmitted: submitted,
-      feePending: charged - submitted,
+      feePending: feeCharged - submitted,
     );
   }
 
@@ -869,8 +916,26 @@ return baseFee + serviceAmount;}
   double get selectedDiscount => discountAmount.value;
 
   double get selectedTotalDue {
+    final studentId = selectedStudentId.value;
+    final feeMonth = selectedFeeMonth.value;
+
+    // Discount already granted on an EARLIER installment of this same
+    // month (resetPaymentForm() clears the discount field between
+    // installments, so `selectedDiscount` below only ever knows about
+    // THIS form's own entry, not any prior one). Without netting this
+    // out too, opening the form for a 2nd/3rd installment overstates
+    // what's left to collect by exactly the earlier discount — and
+    // since this is also the number `validatePayment()` caps the
+    // collectable amount against, it would let staff overcharge a
+    // discounted student on their next installment.
+    final priorDiscountThisMonth = (studentId == null || feeMonth.isEmpty)
+        ? 0.0
+        : _totalDiscountForMonth(studentId, feeMonth);
+
     final remainingMonthFee =
-        (selectedCurrentMonthFee - selectedAlreadyPaidThisMonth)
+        (selectedCurrentMonthFee -
+                selectedAlreadyPaidThisMonth -
+                priorDiscountThisMonth)
             .clamp(0.0, double.infinity);
 
     final total =
@@ -880,6 +945,93 @@ return baseFee + serviceAmount;}
         selectedDiscount;
 
     return total < 0 ? 0.0 : total;
+  }
+
+  // ===========================================================================
+  // RECEIPT FIGURES — for a specific PAST payment (used by ReceiptGenerator)
+  //
+  // FeePayment.totalDue/remainingBalance (fee_payment_model.dart) only
+  // know about their own row: `currentMonthFee` is always the FULL month
+  // fee, and `discount` is only whatever was entered on that one
+  // installment. That's correct for a month paid in a single payment,
+  // but wrong the moment a month is paid in two or more installments —
+  // the 2nd receipt would print "Total Due: [full fee]" and a
+  // "Remaining" that ignores the first installment already collected,
+  // overstating what's still owed by exactly what was already paid.
+  //
+  // These two methods compute the real figures AS THEY STOOD AT THE TIME
+  // OF [payment] — not "as of right now". This matters because a receipt
+  // can be reopened/reprinted long after later installments were paid
+  // (see StudentFeePayments' "View Receipt" on any historical row): a
+  // straight "sum everything for this month" would make an old partial-
+  // payment receipt show "Remaining: 0" once a later installment
+  // eventually clears the month, which misrepresents what was actually
+  // still owed at the moment that payment was made and printed.
+  //
+  // `payments` is loaded from Supabase ordered by created_at ascending
+  // (see SupabaseFeeDataSource), and the post-save fast-path merge in
+  // _submitPaymentUnsafe() only ever appends a brand-new row to the end
+  // — so list position IS chronological order, and "every payment up to
+  // and including this one" can be read directly off that list position
+  // without needing a stored timestamp on the model.
+  // ===========================================================================
+
+  /// Every payment recorded for [payment]'s student/month, up to and
+  /// including [payment] itself, in chronological order.
+  List<FeePayment> _paymentsUpToAndIncluding(FeePayment payment) {
+    final monthPayments = payments
+        .where(
+          (p) =>
+              p.studentId == payment.studentId &&
+              p.feeMonth == payment.feeMonth,
+        )
+        .toList();
+
+    final cutoffIndex = monthPayments.indexWhere((p) => p.id == payment.id);
+
+    if (cutoffIndex == -1) {
+      // [payment] isn't in `payments` yet — only possible in the narrow
+      // instant between the DB write and the fast-path merge finishing
+      // (see _submitPaymentUnsafe()). It's always the most recent
+      // payment when that happens, so treat it as such.
+      return [...monthPayments, payment];
+    }
+
+    return monthPayments.sublist(0, cutoffIndex + 1);
+  }
+
+  /// The true total due for the month [payment] belongs to, as it stood
+  /// at the time [payment] was made: the month's charge, net of every
+  /// discount given up to and including [payment] (not the whole
+  /// month's discount total, which could include LATER installments),
+  /// plus the previous-months balance and fine already correctly fixed
+  /// on [payment]'s own row at the time it was recorded.
+  double totalDueForPayment(FeePayment payment) {
+    final grossCharge = _chargeForMonth(payment.studentId, payment.feeMonth);
+    final charge = grossCharge > 0 ? grossCharge : payment.currentMonthFee;
+
+    final discountUpToThisPayment = _paymentsUpToAndIncluding(
+      payment,
+    ).fold<double>(0.0, (sum, p) => sum + p.discount);
+
+    final netCharge = charge - discountUpToThisPayment;
+    final feeCharged = netCharge < 0 ? 0.0 : netCharge;
+
+    return feeCharged + payment.previousBalance + payment.fine;
+  }
+
+  /// What was genuinely still owed immediately after [payment] was
+  /// recorded — every payment for that month up to and including
+  /// [payment] subtracted from the true total due (as it stood at that
+  /// same point) above. Deliberately does NOT reflect payments made
+  /// LATER than [payment] — see the section note above for why.
+  double remainingBalanceForPayment(FeePayment payment) {
+    final paidUpToThisPayment = _paymentsUpToAndIncluding(
+      payment,
+    ).fold<double>(0.0, (sum, p) => sum + p.amountReceived);
+
+    final remaining = totalDueForPayment(payment) - paidUpToThisPayment;
+    return remaining < 0 ? 0.0 : remaining;
   }
 
   // ===========================================================================
@@ -1081,6 +1233,30 @@ return baseFee + serviceAmount;}
         } else {
           payments[index] = freshPayment;
         }
+      }
+
+      // `transactions` needs the same immediate update `payments` just
+      // got above — chargeTransaction/paymentTransaction were already
+      // built in memory before recordPayment() saved them, so this is
+      // just appending what's already known, no extra fetch needed.
+      // Without this, the receipt shown immediately below (before the
+      // unawaited loadFeeData() background reload finishes) would
+      // compute totalDueForPayment()/remainingBalanceForPayment() from
+      // a `transactions` list that doesn't yet contain THIS payment —
+      // showing the full month fee as still owed even though the
+      // student just paid, on the very receipt handed to them.
+      // Guarded the same way as the `payments` merge above — a realtime
+      // sync echo of this exact write (RealtimeTableSync, 400ms
+      // debounce) could in principle land between the DB write above and
+      // these lines and already reassign `transactions` via its own
+      // loadFeeData(). Checking by id first avoids adding a duplicate on
+      // top of that.
+      if (chargeTransaction != null &&
+          !transactions.any((t) => t.id == chargeTransaction!.id)) {
+        transactions.add(chargeTransaction);
+      }
+      if (!transactions.any((t) => t.id == paymentTransaction.id)) {
+        transactions.add(paymentTransaction);
       }
     } catch (e, stackTrace) {
       AppErrorLogger.log(

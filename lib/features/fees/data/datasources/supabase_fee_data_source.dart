@@ -80,6 +80,32 @@ class SupabaseFeeDataSource implements FeeDataSource {
     return FeePayment.fromMap(Map<String, Object?>.from(rows.first));
   }
 
+  // -----------------------------------------------------------------------
+  // WARNING — STALE, PRE-DISCOUNT-FIX LOGIC, still actually called.
+  //
+  // `_summarize()` below only has fee_transactions to work with — it has
+  // no access to fee_payments.discount — so feeCharged/feePending here
+  // are the OLD, undiscounted figures: the exact phantom-balance bug
+  // that was fixed everywhere the app actually READS FROM (FeeController
+  // computes its own summaries live via computeFeeSummary()/
+  // computeFeeSummaryForMonth(), which DO correctly net out discounts).
+  //
+  // getStudentFeeSummaries() IS called — every time FeeController.
+  // loadFeeData() runs (initial load, every realtime-sync tick, every
+  // post-payment background reload) — but only to populate
+  // `studentFeeSummaries`, an Rx list confirmed unread by any screen
+  // today (kept "for API compatibility"). So there's no money-display
+  // bug live right now, but two real costs: (1) it silently refetches
+  // ALL of fee_transactions a second time on every load, on top of the
+  // identical fetch already done for `transactions` in the same
+  // Future.wait — wasted network/DB load that grows with data; (2) it's
+  // a landmine — the moment anyone wires `studentFeeSummaries` (or
+  // `getStudentFeeSummary()`) into a widget "for consistency," the
+  // phantom-balance bug comes right back. Fix properly (net out
+  // discount here too, and drop the duplicate fetch) before ever using
+  // this for anything user-facing.
+  // -----------------------------------------------------------------------
+
   @override
   Future<List<StudentFeeSummary>> getStudentFeeSummaries() async {
     final transactions = await getTransactions();

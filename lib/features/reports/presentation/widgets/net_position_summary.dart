@@ -55,11 +55,19 @@ class NetPositionSummary extends StatelessWidget {
     );
   }
 
+  // Income/Expenses are always >= 0, so `sign` is a no-op for them —
+  // but Net Position genuinely can be negative on a losing month, and
+  // used to print with the same "Rs. 15,000" text as a Rs 15,000
+  // PROFIT month, distinguishable only by a subtle red vs. default text
+  // color. A quick glance, a black-and-white printout, or a colorblind
+  // viewer would read a loss as a gain. Now prints "-Rs. 15,000".
   String _formatAmount(double amount) {
-    return 'Rs. ${amount.abs().toStringAsFixed(0).replaceAllMapped(
-          RegExp(r'\B(?=(\d{3})+(?!\d))'),
-          (match) => ',',
-        )}';
+    final sign = amount < 0 ? '-' : '';
+    return '$sign'
+        'Rs. ${amount.abs().toStringAsFixed(0).replaceAllMapped(
+              RegExp(r'\B(?=(\d{3})+(?!\d))'),
+              (match) => ',',
+            )}';
   }
 }
 

@@ -61,6 +61,18 @@ class FeePayment {
     this.receiptAttachmentPath,
   });
 
+  // CAUTION: these only know about THIS row. `currentMonthFee` is always
+  // the full month fee (not "remaining after earlier installments this
+  // month"), and `discount` is only whatever was entered on this one
+  // payment — not the month's total discount across every installment.
+  // That's correct for a month paid in a single payment, but WRONG the
+  // moment a month is paid in 2+ installments (overstates what's still
+  // owed by whatever was already collected earlier that month). Do not
+  // use these for anything the client will see — use
+  // FeeController.totalDueForPayment()/remainingBalanceForPayment()
+  // instead, which recompute from every payment recorded for the month.
+  // Kept here only because removing them would be a bigger diff than
+  // this fix needs; nothing in the app reads them anymore.
   double get totalDue => currentMonthFee + previousBalance + fine - discount;
 
   double get remainingBalance => totalDue - amountReceived;

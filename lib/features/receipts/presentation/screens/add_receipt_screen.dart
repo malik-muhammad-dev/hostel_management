@@ -380,6 +380,23 @@ class _StudentPicker extends StatelessWidget {
         .where((student) => student.id != null)
         .toList();
 
+    // Editing a receipt for a student who has since been archived: they
+    // won't be in activeStudents, so the dropdown would have no entry
+    // matching `selectedStudentId` and render blank — confusing (looks
+    // like no student is attached) even though one genuinely is.
+    // Appending them (from the full student list, not just active) as
+    // an extra option means the field displays correctly. This does NOT
+    // let staff attach a NEW receipt to an archived student — this only
+    // adds an entry for whichever student is already selected.
+    final selectedId = controller.selectedStudentId.value;
+    if (selectedId != null && !students.any((s) => s.id == selectedId)) {
+      final archivedStudent = controller.studentController.students
+          .firstWhereOrNull((s) => s.id == selectedId);
+      if (archivedStudent != null) {
+        students.add(archivedStudent);
+      }
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

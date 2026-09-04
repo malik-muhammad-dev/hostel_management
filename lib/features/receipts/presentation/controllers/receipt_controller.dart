@@ -255,10 +255,18 @@ class ReceiptController extends GetxController {
 
     if (type == ReceivedFromType.student) {
       studentId = selectedStudentId.value;
-      final student = studentController.activeStudents.firstWhereOrNull(
+      // Look up against the FULL student list, not activeStudents.
+      // A cash receipt for this student may be edited (e.g. fixing a
+      // typo in Notes) long after that student graduated/left and was
+      // archived — activeStudents excludes them, which used to silently
+      // turn `receivedFrom` into null and permanently erase "who this
+      // money was for" on save. The picker UI still only lets someone
+      // choose a NEW student from activeStudents (see add_receipt_screen
+      // .dart) — this only affects re-resolving an already-selected id.
+      final student = studentController.students.firstWhereOrNull(
         (s) => s.id == studentId,
       );
-      receivedFrom = student?.name;
+      receivedFrom = student?.name ?? editingReceipt.value?.receivedFrom;
     } else if (type == ReceivedFromType.faculty) {
       final typed = receivedFromController.text.trim();
       receivedFrom = typed.isEmpty ? null : typed;

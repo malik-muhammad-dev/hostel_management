@@ -203,7 +203,13 @@ class _DashboardContent extends StatelessWidget {
               ),
               DashboardStatCard(
                 title: 'Net Profit',
-                value: formatAmount(profit.abs()),
+                // Not .abs() — a losing month is genuinely negative, and
+                // the icon/subtitle/color already flag "Running at a
+                // loss," but the number itself used to print identically
+                // to a same-size PROFIT month (e.g. "Rs. 15,000" either
+                // way). _formatNumber's toStringAsFixed(0) + comma regex
+                // handles a leading "-" correctly on its own.
+                value: formatAmount(profit),
                 subtitle: isProfitable ? 'In profit' : 'Running at a loss',
                 icon: isProfitable
                     ? Icons.trending_up_rounded
