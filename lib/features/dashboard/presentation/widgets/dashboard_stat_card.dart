@@ -28,14 +28,19 @@ class DashboardStatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(20),
+      // Shrunk from 20 all round — client asked for smaller Dashboard
+      // cards so the whole board fits on screen without scrolling. Every
+      // size below (icon box, icon, spacing, font sizes) was scaled down
+      // together with this, not just the padding, so the card still
+      // looks proportioned rather than merely cropped.
+      padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
         // A soft tint of the card's own accent color — this is what
         // gives each card its own "personality" (blue-ish, green-ish,
         // gold-ish...) rather than every card looking identical except
         // for the small icon.
         color: accentColor.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: accentColor.withValues(alpha: 0.18)),
       ),
       child: Column(
@@ -45,13 +50,13 @@ class DashboardStatCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
                   color: accentColor.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: Icon(icon, color: accentColor, size: 22),
+                child: Icon(icon, color: accentColor, size: 17),
               ),
 
               if (onEdit != null)
@@ -61,32 +66,21 @@ class DashboardStatCard extends StatelessWidget {
                   visualDensity: VisualDensity.compact,
                   icon: Icon(
                     Icons.edit_outlined,
-                    size: 18,
+                    size: 16,
                     color: accentColor,
                   ),
                 ),
             ],
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
 
           Text(
             value,
             style: const TextStyle(
-              fontSize: 22,
+              fontSize: 18,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.3,
-              color: AppColors.textPrimary,
-            ),
-          ),
-
-          const SizedBox(height: 4),
-
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
             ),
           ),
@@ -94,9 +88,20 @@ class DashboardStatCard extends StatelessWidget {
           const SizedBox(height: 2),
 
           Text(
+            title,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+
+          const SizedBox(height: 1),
+
+          Text(
             subtitle,
             style: const TextStyle(
-              fontSize: 11.5,
+              fontSize: 10.5,
               color: AppColors.textSecondary,
             ),
           ),

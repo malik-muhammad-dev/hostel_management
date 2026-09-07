@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
+import '../../../expenses/models/expense_model.dart';
 import '../../../expenses/presentation/controllers/expense_controller.dart';
 import '../../../fees/data/models/fee_payment_model.dart';
 import '../../../fees/presentation/controllers/fee_controller.dart';
@@ -252,10 +253,18 @@ class DashboardController extends GetxController {
   //   ReceiptController.netCashBox). Student Cash "Cash" entries just
   //   add to Cash, same as everywhere else.
   //
+  // - EXPENSES subtract from whichever box was actually spent from: an
+  //   Account-mode expense (paid out of the bank) reduces Account Box;
+  //   a Cash-mode expense (paid out of physical cash on hand) reduces
+  //   Cash Box. This is the one place real money leaves either box —
+  //   every other line above only ever adds.
+  //
   // Total Amount (above) already includes every fee payment regardless
   // of method (via allTimeCollected) plus the Account portion of
-  // Student Cash — that formula was already correct and needed no
-  // change here.
+  // Student Cash, minus every expense regardless of method (via
+  // allTimeExpenses) — that formula was already correct and needed no
+  // change here. This section only affects the Cash Box / Account Box
+  // split shown on the Dashboard.
   // ---------------------------------------------------------------------------
 
   double get _feeCashCollected {
@@ -270,12 +279,25 @@ class DashboardController extends GetxController {
         .fold<double>(0.0, (sum, payment) => sum + payment.amountReceived);
   }
 
+  double get _expenseCashPaid {
+    return expenseController.expenses
+        .where((expense) => expense.paymentMode == ExpensePaymentMode.cash)
+        .fold<double>(0.0, (sum, expense) => sum + expense.amount);
+  }
+
+  double get _expenseAccountPaid {
+    return expenseController.expenses
+        .where((expense) => expense.paymentMode == ExpensePaymentMode.account)
+        .fold<double>(0.0, (sum, expense) => sum + expense.amount);
+  }
+
   double get cashBox =>
       _feeCashCollected + receiptController.cashReceipts -
-      receiptController.accountReceipts;
+      receiptController.accountReceipts - _expenseCashPaid;
 
   double get accountBox =>
-      _feeNonCashCollected + receiptController.accountReceipts;
+      _feeNonCashCollected + receiptController.accountReceipts -
+      _expenseAccountPaid;
 
   Future<void> setOpeningBalance(double value) {
     debugPrint(

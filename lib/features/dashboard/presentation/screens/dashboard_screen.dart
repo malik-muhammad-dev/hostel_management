@@ -229,14 +229,14 @@ class _DashboardContent extends StatelessWidget {
               DashboardStatCard(
                 title: 'Total Cash',
                 value: formatAmount(cash),
-                subtitle: 'All-time, Fees + Student Cash combined',
+                subtitle: 'All-time, Fees + Student Cash − Cash expenses',
                 icon: Icons.payments_outlined,
                 accentColor: const Color(0xFF0E8A8A),
               ),
               DashboardStatCard(
                 title: 'Total Account',
                 value: formatAmount(account),
-                subtitle: 'All-time, Fees + Student Cash combined',
+                subtitle: 'All-time, Fees + Student Cash − Account expenses',
                 icon: Icons.account_balance_outlined,
                 accentColor: const Color(0xFF0E8A8A),
               ),
@@ -250,8 +250,16 @@ class _DashboardContent extends StatelessWidget {
             // same visual result as before.
             return LayoutBuilder(
               builder: (context, constraints) {
-                const spacing = 16.0;
-                final columns = constraints.maxWidth < 900 ? 2 : 3;
+                // Tightened from 16 — smaller gaps between the now-
+                // smaller cards, and a 4th column on a wide desktop
+                // window so all 7 cards fit in 2 rows instead of 3,
+                // both in service of the same "no scrolling" request.
+                const spacing = 12.0;
+                final columns = constraints.maxWidth < 900
+                    ? 2
+                    : constraints.maxWidth < 1300
+                        ? 3
+                        : 4;
                 final cardWidth =
                     (constraints.maxWidth - spacing * (columns - 1)) /
                         columns;

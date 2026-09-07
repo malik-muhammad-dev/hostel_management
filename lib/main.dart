@@ -53,7 +53,7 @@ void main() {
         await Supabase.initialize(
           url: SupabaseConfig.url,
           anonKey: SupabaseConfig.anonKey,
-        );
+        ); 
 
         // Desktop platforms (Linux/Windows/macOS) don't have native
         // sqflite support — they need the ffi-backed factory instead.
