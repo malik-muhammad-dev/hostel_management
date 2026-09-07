@@ -46,15 +46,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
           return Row(
             children: [
-              // Was Expanded(child: _HeroPanel()) with no flex — that
-              // defaults to flex:1 against the form panel's flex:4 below,
-              // so the branding panel only ever got 1/5 of the window's
-              // width. Its own content (the 340px-wide description box,
-              // plus the "Obaid Noor Institute..." credit line) needs
-              // more room than that on any normal window size, so it was
-              // getting cut off at the panel's right edge instead of
-              // showing in full. Rebalanced to a roughly even split.
-              if (showHeroPanel) const Expanded(flex: 5, child: _HeroPanel()),
+              // Roughly 40/60 — branding panel on the left, login form
+              // clearly the larger, primary side on the right. (Originally
+              // this had no flex at all here, which silently defaulted to
+              // flex:1 against the form's flex:4 — a 20/80 split so lopsided
+              // it clipped this panel's own content. Widened enough to hold
+              // its content properly, while keeping the form as the bigger
+              // side.)
+              if (showHeroPanel) const Expanded(flex: 4, child: _HeroPanel()),
               Expanded(
                 flex: showHeroPanel ? 6 : 1,
                 child: _FormPanel(
@@ -195,7 +194,7 @@ class _HeroPanel extends StatelessWidget {
                               ? constraints.maxWidth
                               : 340,
                           child: Text(
-                            'A single, secure record for every student\'s stay — '
+                            'A single, secure record for every student\'s stay in the hostel, with all the details about their '
                             'admissions, fees, and daily hostel operations in one place.',
                             style: TextStyle(
                               fontSize: 14.5,

@@ -68,7 +68,9 @@ class RecordPaymentScreen extends StatelessWidget {
           const PaymentDateSection(),
           const SizedBox(height: 28),
 
-          PaymentActions(
+          Obx(
+            () => PaymentActions(
+            isSubmitting: feeController.isSubmittingPayment.value,
            onCancel: () {
   feeController.resetPaymentForm();
   Get.find<AppShellController>().popPage();
@@ -138,6 +140,7 @@ class RecordPaymentScreen extends StatelessWidget {
                 Get.find<AppShellController>().popPage();
               }
             },
+            ),
           ),
         ],
       ),

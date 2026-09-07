@@ -54,6 +54,16 @@ class FeeController extends GetxController {
 
   final amountReceived = 0.0.obs;
 
+  // True for the duration of a submitPayment() call — lets
+  // record_payment_screen.dart disable its Save button and show a
+  // spinner while a save is actually in flight, and also lets
+  // submitPayment() itself refuse a second, overlapping call outright
+  // (see submitPayment()). Two overlapping calls used to both pass
+  // validation against the same stale local numbers and both go on to
+  // create their own charge+payment — this is what actually let a
+  // student's month get double-charged.
+  final isSubmittingPayment = false.obs;
+
   // Backs `selectedDiscount` — kept as its own Rx (mirroring
   // `amountReceived` above) rather than reading discountController.text
   // straight from a getter, because a plain (non-Rx) read inside an Obx
@@ -235,6 +245,28 @@ await loadStudentServiceAmounts();
     return _formatFeeMonth(
       now.year,
       now.month,
+    );
+  }
+
+  /// Public wrapper around [_currentFeeMonth] — the current calendar
+  /// month in the same 'YYYY-MM' format every fee month is stored in.
+  /// Exposed for screens/dialogs outside this controller that need to
+  /// know "which month counts as current" (e.g. deciding whether a
+  /// month's charge is still correctable).
+  String get currentFeeMonth => _currentFeeMonth();
+
+  /// The existing charge transaction for [studentId] in the current
+  /// calendar month, or null if no charge has been created for it yet
+  /// (a fresh, not-yet-billed month — nothing to correct, because
+  /// nothing's been locked in).
+  FeeTransaction? currentMonthChargeFor(String studentId) {
+    final month = _currentFeeMonth();
+
+    return transactions.firstWhereOrNull(
+      (t) =>
+          t.studentId == studentId &&
+          t.feeMonth == month &&
+          t.type == FeeTransactionType.charge,
     );
   }
 
@@ -1095,6 +1127,26 @@ return baseFee + serviceAmount;}
       return null;
     }
 
+    // -------------------------------------------------------------------
+    // Refuse a second call while one is already in flight.
+    //
+    // record_payment_screen.dart disables its Save button while
+    // isSubmittingPayment is true, which handles a normal double-tap.
+    // This is the backup for everything that check can't catch — e.g.
+    // the button re-enabling before this flag flips back (a GetX rebuild
+    // gap), or any other future caller. Without this, two overlapping
+    // calls both read the same not-yet-updated local transactions list,
+    // both decide "no charge yet for this month" is true, and both go on
+    // to create their own charge+payment — exactly how a student's month
+    // ended up double-charged.
+    // -------------------------------------------------------------------
+
+    if (isSubmittingPayment.value) {
+      return null;
+    }
+
+    isSubmittingPayment.value = true;
+
     try {
       return await _submitPaymentUnsafe();
     } catch (e, stackTrace) {
@@ -1110,6 +1162,8 @@ return baseFee + serviceAmount;}
       debugPrint('[DEBUG] stackTrace: $stackTrace');
       AppErrorLogger.log('FeeController.submitPayment', e, stackTrace);
       return null;
+    } finally {
+      isSubmittingPayment.value = false;
     }
   }
 
@@ -1293,8 +1347,96 @@ return baseFee + serviceAmount;}
     await repository.addTransaction(transaction);
     await loadFeeData(notifyOnFailure: false);
   }
+
   // ===========================================================================
-  // Load Student Services 
+  // CORRECTING AN ALREADY-CREATED MONTH'S CHARGE
+  //
+  // The ONLY supported way to change what a student was charged for a
+  // month after the charge transaction already exists. Deliberately
+  // narrow: refuses once that month has no pending balance left (fully
+  // paid/settled), so a past, reconciled month stays exactly as
+  // permanent as it always has been — this only ever touches a month
+  // that's still open (unpaid or partially paid). Every other screen's
+  // "existing charge = historical source of truth" behavior
+  // (computeFeeSummary/computeFeeSummaryForMonth) is completely
+  // unaffected by this existing; it simply changes what that "historical
+  // truth" actually is, once, on purpose.
+  //
+  // Returns null on success, or a message to show the admin on failure.
+  // ===========================================================================
+
+  Future<String?> updateMonthlyCharge({
+    required String studentId,
+    required String feeMonth,
+    required double newAmount,
+  }) async {
+    if (newAmount < 0) {
+      return 'Amount cannot be negative.';
+    }
+
+    final existing = transactions.firstWhereOrNull(
+      (t) =>
+          t.studentId == studentId &&
+          t.feeMonth == feeMonth &&
+          t.type == FeeTransactionType.charge,
+    );
+
+    if (existing == null || existing.id == null) {
+      return 'No charge has been created for this month yet — nothing to correct.';
+    }
+
+    // Checked against the CURRENT (pre-correction) charge — this is
+    // exactly the same "is this month still open" question every other
+    // screen already answers via computeFeeSummaryForMonth, so this
+    // can never disagree with what the Fees table/student page are
+    // showing right now.
+    final summaryBeforeCorrection = computeFeeSummaryForMonth(
+      studentId,
+      feeMonth,
+    );
+
+    if (summaryBeforeCorrection.feePending <= 0) {
+      return 'This month is already fully paid and can\'t be corrected here.';
+    }
+
+    try {
+      await repository.updateMonthlyCharge(
+        transactionId: existing.id!,
+        newDebit: newAmount,
+      );
+
+      final index = transactions.indexWhere((t) => t.id == existing.id);
+      if (index != -1) {
+        transactions[index] = FeeTransaction(
+          id: existing.id,
+          studentId: existing.studentId,
+          date: existing.date,
+          feeMonth: existing.feeMonth,
+          description: existing.description,
+          debit: newAmount,
+          credit: existing.credit,
+          balance: existing.balance,
+          type: existing.type,
+        );
+      }
+
+      // Deliberately not awaited — the local list is already corrected
+      // above for an instant UI update; this just catches up anything
+      // else (other students' summaries, realtime sync to other PCs)
+      // in the background, the same pattern every other write here
+      // follows.
+      // ignore: unawaited_futures
+      loadFeeData(notifyOnFailure: false);
+
+      return null;
+    } catch (e, stackTrace) {
+      AppErrorLogger.log('FeeController.updateMonthlyCharge', e, stackTrace);
+      return 'Something went wrong correcting this month\'s charge. Please try again.';
+    }
+  }
+
+  // ===========================================================================
+  // Load Student Services
   // ===========================================================================
 Future<void> loadStudentServiceAmounts() async {
   final studentController = Get.find<StudentController>();
@@ -1374,11 +1516,11 @@ Future<void> loadStudentServiceAmounts() async {
       return 'Payment amount cannot be greater than the total due.';
     }
 
-    if (selectedPaymentMethod.value ==
-            PaymentMethod.bankTransfer &&
-        receiptAttachmentPath.value == null) {
-      return 'Please attach the bank payment receipt.';
-    }
+    // Was required for Bank Transfer (blocked submission with "Please
+    // attach the bank payment receipt." if nothing was attached) — no
+    // longer enforced. Staff can still attach one via the Bank Payment
+    // Receipt section if they have it; it's just optional now, same as
+    // every other payment method.
 
     return null;
   }

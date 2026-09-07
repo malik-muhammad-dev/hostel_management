@@ -81,6 +81,8 @@ class StudentFeePayments extends StatelessWidget {
 
           const SizedBox(height: 20),
 
+          _CurrentMonthChargeCard(studentId: studentId),
+
           _PaymentHistoryCard(
             payments: studentPayments,
             studentId: studentId,
@@ -325,6 +327,314 @@ class _PaymentStatusBadge extends StatelessWidget {
               : AppColors.textSecondary,
         ),
       ),
+    );
+  }
+}
+
+// =============================================================================
+// Current Month Charge — lets an admin correct THIS student's THIS-month
+// charge after the fact (e.g. a fee was reduced after the first payment
+// for the month already locked the old amount in). Only offered while the
+// month is still open (a pending balance remains); once it's fully paid,
+// this shows a "Settled" tag instead and the amount stays permanent, same
+// as every other closed month always has been.
+// =============================================================================
+
+class _CurrentMonthChargeCard extends StatelessWidget {
+  final String studentId;
+
+  const _CurrentMonthChargeCard({required this.studentId});
+
+  @override
+  Widget build(BuildContext context) {
+    final feeController = Get.find<FeeController>();
+    final month = feeController.currentFeeMonth;
+    final existingCharge = feeController.currentMonthChargeFor(studentId);
+
+    // Nothing charged yet for the current month (a fresh, not-yet-billed
+    // month) — there's nothing to correct, so this card simply doesn't
+    // show. The SizedBox above/below this widget in the parent Column
+    // already provides the right spacing either way.
+    if (existingCharge == null) {
+      return const SizedBox.shrink();
+    }
+
+    final summary = feeController.computeFeeSummaryForMonth(studentId, month);
+    final isOpen = summary.feePending > 0;
+
+    // Show/edit the RAW charge (existingCharge.debit) here, not
+    // summary.feeCharged — that summary figure is already net of any
+    // discount given for this month (see computeFeeSummaryForMonth), while
+    // the value this card corrects is the underlying transaction's debit,
+    // which is always the pre-discount amount (discounts are recorded
+    // against the payment, never against the charge itself — see
+    // _submitPaymentUnsafe). Displaying the net figure here but writing it
+    // straight back as the new debit would silently double-apply the
+    // discount every time this ran on a discounted student.
+    final rawCharge = existingCharge.debit;
+
+    return Column(
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.primaryLight,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.calendar_month_outlined,
+                  size: 19,
+                  color: AppColors.primary,
+                ),
+              ),
+
+              const SizedBox(width: 12),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Current Month Charge — ${_formatMonthLabel(month)}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      _formatAmount(rawCharge),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              if (isOpen)
+                OutlinedButton.icon(
+                  onPressed: () => showDialog<void>(
+                    context: context,
+                    builder: (_) => _EditChargeDialog(
+                      studentId: studentId,
+                      feeMonth: month,
+                      monthLabel: _formatMonthLabel(month),
+                      currentAmount: rawCharge,
+                    ),
+                  ),
+                  icon: const Icon(Icons.edit_outlined, size: 16),
+                  label: const Text('Correct Amount'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 11,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryLight,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    'Settled',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 20),
+      ],
+    );
+  }
+
+  String _formatAmount(double amount) {
+    final formatted = amount
+        .toStringAsFixed(0)
+        .replaceAllMapped(
+          RegExp(r'\B(?=(\d{3})+(?!\d))'),
+          (match) => ',',
+        );
+
+    return 'Rs. $formatted';
+  }
+
+  String _formatMonthLabel(String value) {
+    final parts = value.split('-');
+    if (parts.length != 2) return value;
+
+    final year = int.tryParse(parts[0]);
+    final month = int.tryParse(parts[1]);
+    if (year == null || month == null || month < 1 || month > 12) {
+      return value;
+    }
+
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+
+    return '${months[month - 1]} $year';
+  }
+}
+
+// =============================================================================
+// Edit Charge Dialog
+// =============================================================================
+
+class _EditChargeDialog extends StatefulWidget {
+  final String studentId;
+  final String feeMonth;
+  final String monthLabel;
+  final double currentAmount;
+
+  const _EditChargeDialog({
+    required this.studentId,
+    required this.feeMonth,
+    required this.monthLabel,
+    required this.currentAmount,
+  });
+
+  @override
+  State<_EditChargeDialog> createState() => _EditChargeDialogState();
+}
+
+class _EditChargeDialogState extends State<_EditChargeDialog> {
+  late final TextEditingController _amountController;
+  String? _errorText;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _amountController = TextEditingController(
+      text: widget.currentAmount.toStringAsFixed(0),
+    );
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final parsed = double.tryParse(_amountController.text.trim());
+
+    if (parsed == null || parsed < 0) {
+      setState(() {
+        _errorText = 'Enter a valid amount.';
+      });
+      return;
+    }
+
+    setState(() {
+      _isSaving = true;
+      _errorText = null;
+    });
+
+    final feeController = Get.find<FeeController>();
+
+    final error = await feeController.updateMonthlyCharge(
+      studentId: widget.studentId,
+      feeMonth: widget.feeMonth,
+      newAmount: parsed,
+    );
+
+    if (!mounted) return;
+
+    if (error != null) {
+      setState(() {
+        _isSaving = false;
+        _errorText = error;
+      });
+      return;
+    }
+
+    Navigator.of(context).pop();
+
+    Get.snackbar(
+      'Charge Corrected',
+      '${widget.monthLabel} charge updated to Rs. ${parsed.toStringAsFixed(0)}.',
+      snackPosition: SnackPosition.BOTTOM,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Correct ${widget.monthLabel} Charge'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'This changes what this student was actually charged for this '
+            'month. Only use this to fix a mistake — not to grant an '
+            'ongoing discount (that belongs on the payment form instead).',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _amountController,
+            keyboardType: const TextInputType.numberWithOptions(
+              decimal: true,
+            ),
+            enabled: !_isSaving,
+            decoration: InputDecoration(
+              labelText: 'Correct Amount',
+              errorText: _errorText,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSaving ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _isSaving ? null : _save,
+          child: _isSaving
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Save'),
+        ),
+      ],
     );
   }
 }

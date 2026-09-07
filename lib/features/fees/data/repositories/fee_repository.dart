@@ -47,4 +47,14 @@ class FeeRepository {
       paymentTransaction: paymentTransaction,
     );
   }
+
+  Future<void> updateMonthlyCharge({
+    required String transactionId,
+    required double newDebit,
+  }) {
+    return dataSource.updateMonthlyCharge(
+      transactionId: transactionId,
+      newDebit: newDebit,
+    );
+  }
 }

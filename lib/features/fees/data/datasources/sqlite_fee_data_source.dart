@@ -169,4 +169,18 @@ class SqliteFeeDataSource implements FeeDataSource {
       );
     });
   }
+
+  @override
+  Future<void> updateMonthlyCharge({
+    required String transactionId,
+    required double newDebit,
+  }) async {
+    final db = await _db;
+    await db.update(
+      'fee_transactions',
+      {'debit': newDebit},
+      where: 'id = ? AND type = ?',
+      whereArgs: [transactionId, 'charge'],
+    );
+  }
 }

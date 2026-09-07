@@ -289,4 +289,28 @@ class MockFeeDataSource implements FeeDataSource {
     }
     _transactions.add(paymentTransaction);
   }
+
+  @override
+  Future<void> updateMonthlyCharge({
+    required String transactionId,
+    required double newDebit,
+  }) async {
+    final index = _transactions.indexWhere(
+      (t) => t.id == transactionId && t.type == FeeTransactionType.charge,
+    );
+    if (index == -1) return;
+
+    final existing = _transactions[index];
+    _transactions[index] = FeeTransaction(
+      id: existing.id,
+      studentId: existing.studentId,
+      date: existing.date,
+      feeMonth: existing.feeMonth,
+      description: existing.description,
+      debit: newDebit,
+      credit: existing.credit,
+      balance: existing.balance,
+      type: existing.type,
+    );
+  }
 }

@@ -42,4 +42,19 @@ abstract class FeeDataSource {
     FeeTransaction? chargeTransaction,
     required FeeTransaction paymentTransaction,
   });
+
+  // ---------------------------------------------------------------------------
+  // Corrects an EXISTING charge transaction's amount in place — used when a
+  // student's fee was changed after their first payment for that month had
+  // already created (and would otherwise permanently lock) the charge. Only
+  // `debit` changes; the row's id, date, student, and month stay exactly as
+  // they were. FeeController is responsible for deciding WHETHER a given
+  // month is still allowed to be corrected (see
+  // FeeController.updateMonthlyCharge) — this method just performs the
+  // write, with no business rule of its own.
+  // ---------------------------------------------------------------------------
+  Future<void> updateMonthlyCharge({
+    required String transactionId,
+    required double newDebit,
+  });
 }

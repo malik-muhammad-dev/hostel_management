@@ -212,4 +212,22 @@ class SupabaseFeeDataSource implements FeeDataSource {
       },
     );
   }
+
+  @override
+  Future<void> updateMonthlyCharge({
+    required String transactionId,
+    required double newDebit,
+  }) async {
+    final nowIso = DateTime.now().toUtc().toIso8601String();
+
+    // `.eq('type', 'charge')` is a belt-and-braces check, not the primary
+    // guard — `transactionId` alone already identifies exactly one row.
+    // It just guarantees this can never touch a payment-type row even if
+    // a wrong id were ever passed in.
+    await _client
+        .from('fee_transactions')
+        .update({'debit': newDebit, 'updated_at': nowIso})
+        .eq('id', transactionId)
+        .eq('type', 'charge');
+  }
 }

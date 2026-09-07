@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import 'package:hostel_management/core/widgets/app_shell.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../fees/presentation/controllers/fee_controller.dart';
 import '../../data/models/student_model.dart';
 import '../controllers/student_controller.dart';
 import '../controllers/student_document_controller.dart';
@@ -231,6 +232,30 @@ class AddStudentScreen extends StatelessWidget {
 
   final studentModel = formController.buildStudentModel();
 
+  // ---------------------------------------------------------------------
+  // Heads-up: warn if this edit changes the fee AND the current month
+  // already has a charge locked in for this student (see
+  // _confirmFeeChangeIfNeeded) — asked before isSaving flips on, so the
+  // Save button doesn't show a spinner while this dialog is waiting on
+  // the admin.
+  // ---------------------------------------------------------------------
+
+  if (formController.isEditMode) {
+    final proceed = await _confirmFeeChangeIfNeeded(
+      context,
+      formController,
+      studentModel,
+    );
+
+    if (!proceed) {
+      return;
+    }
+
+    if (!context.mounted) {
+      return;
+    }
+  }
+
   formController.isSaving.value = true;
 
   try {
@@ -367,6 +392,143 @@ class AddStudentScreen extends StatelessWidget {
     formController.isSaving.value = false;
   }
 }
+
+  // ---------------------------------------------------------------------
+  // Warns the admin, before saving, when an edit changes this student's
+  // effective monthly fee AND the current month already has a charge
+  // transaction created for them — because that existing charge is a
+  // locked historical record (see FeeController's "existing charge =
+  // historical source of truth" rule, and computeFeeSummaryForMonth's
+  // `charged > 0` branch) and saving this form alone will NOT update it.
+  // Returns true to proceed with the save, false to let the admin go
+  // back (e.g. to cancel, or to correct the fee then fix this month's
+  // charge separately from the student's Fee tab after saving).
+  // ---------------------------------------------------------------------
+
+  Future<bool> _confirmFeeChangeIfNeeded(
+    BuildContext context,
+    StudentFormController formController,
+    StudentModel studentModel,
+  ) async {
+    final oldStudent = formController.editingStudent.value;
+
+    if (oldStudent?.id == null) {
+      return true;
+    }
+
+    final oldFee = oldStudent!.netMonthlyFee ?? oldStudent.monthlyFee;
+    final newFee = studentModel.netMonthlyFee ?? studentModel.monthlyFee;
+
+    if (_feesEffectivelyEqual(oldFee, newFee)) {
+      return true;
+    }
+
+    final feeController = Get.find<FeeController>();
+    final existingCharge = feeController.currentMonthChargeFor(oldStudent.id!);
+
+    // Nothing charged yet for the current month — the new fee will simply
+    // apply whenever that charge eventually gets created. Nothing to warn
+    // about.
+    if (existingCharge == null) {
+      return true;
+    }
+
+    final month = feeController.currentFeeMonth;
+    final monthLabel = _formatMonthLabel(month);
+    final isOpen = feeController
+            .computeFeeSummaryForMonth(oldStudent.id!, month)
+            .feePending >
+        0;
+
+    final chargeAmount = _formatAmount(existingCharge.debit);
+
+    final message = isOpen
+        ? 'This student already has a charge of $chargeAmount created for '
+            '$monthLabel. Saving this fee change will NOT update that charge '
+            'automatically — go to this student\'s Fee tab afterward and use '
+            '"Correct Amount" if $monthLabel needs to change too.\n\n'
+            'Continue saving?'
+        : 'This student already has a charge of $chargeAmount for '
+            '$monthLabel, and it\'s already fully paid — that amount is '
+            'locked and can\'t be changed. This fee change will only take '
+            'effect from next month onward.\n\nContinue saving?';
+
+    if (!context.mounted) {
+      return false;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Heads Up — Fee Change'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Go Back'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Continue Saving'),
+          ),
+        ],
+      ),
+    );
+
+    return confirmed ?? false;
+  }
+
+  // ---------------------------------------------------------------------
+  // Compares two possibly-null fee amounts for deciding whether to show
+  // the heads-up dialog. Rounded to the nearest rupee — every fee in
+  // this app is entered as a whole number, and the fee text fields
+  // round-trip through toStringAsFixed(0) (see student_form_controller's
+  // _populateStudent), so comparing raw doubles could occasionally
+  // report a "change" that is really just that rounding, even when the
+  // admin never touched the fee fields at all.
+  // ---------------------------------------------------------------------
+
+  bool _feesEffectivelyEqual(double? a, double? b) {
+    if (a == null && b == null) {
+      return true;
+    }
+
+    if (a == null || b == null) {
+      return false;
+    }
+
+    return a.round() == b.round();
+  }
+
+  String _formatAmount(double amount) {
+    final formatted = amount
+        .toStringAsFixed(0)
+        .replaceAllMapped(
+          RegExp(r'\B(?=(\d{3})+(?!\d))'),
+          (match) => ',',
+        );
+
+    return 'Rs. $formatted';
+  }
+
+  String _formatMonthLabel(String value) {
+    final parts = value.split('-');
+    if (parts.length != 2) return value;
+
+    final year = int.tryParse(parts[0]);
+    final month = int.tryParse(parts[1]);
+    if (year == null || month == null || month < 1 || month > 12) {
+      return value;
+    }
+
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+
+    return '${months[month - 1]} $year';
+  }
+
   void _showMessage(
     BuildContext context,
     String message,
