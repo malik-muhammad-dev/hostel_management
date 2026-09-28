@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:get/get.dart';
 
+import '../../../balance/models/balance_addition_model.dart';
+import '../../../balance/presentation/controllers/balance_addition_controller.dart';
 import '../../../expenses/models/expense_model.dart';
 import '../../../expenses/presentation/controllers/expense_controller.dart';
 import '../../../fees/data/models/fee_payment_model.dart';
@@ -28,6 +30,8 @@ class DashboardController extends GetxController {
   final AppSettingsController settingsController =
       Get.find<AppSettingsController>();
   final ReceiptController receiptController = Get.find<ReceiptController>();
+  final BalanceAdditionController balanceController =
+      Get.find<BalanceAdditionController>();
 
   static const _monthNames = [
     'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -47,13 +51,15 @@ class DashboardController extends GetxController {
     final anyLoading = studentController.isLoading.value ||
         feeController.isLoading.value ||
         expenseController.isLoading.value ||
-        receiptController.isLoading.value;
+        receiptController.isLoading.value ||
+        balanceController.isLoading.value;
 
     final allEmpty = studentController.students.isEmpty &&
         feeController.payments.isEmpty &&
         feeController.transactions.isEmpty &&
         expenseController.expenses.isEmpty &&
-        receiptController.receipts.isEmpty;
+        receiptController.receipts.isEmpty &&
+        balanceController.balanceAdditions.isEmpty;
 
     return anyLoading && allEmpty;
   }
@@ -69,8 +75,31 @@ class DashboardController extends GetxController {
   // Top stat cards
   // ---------------------------------------------------------------------------
 
-  int get totalActiveStudents => studentController.activeStudents.length;
+  // `StudentController.activeStudents` really means "not Archived" — it
+  // deliberately still includes students marked 'Inactive', because
+  // other features (Fees, Reports) need to keep showing/collecting from
+  // someone who's Inactive, just not Archived. The Dashboard's "current
+  // state of the hostel" figures are different: an Inactive student
+  // should disappear from here entirely (student count, this month's
+  // Collected/Expected, who-owes) until they're made Active again. This
+  // filter is local to the Dashboard on purpose — it must NOT replace
+  // `activeStudents` itself, which other screens still rely on.
+  List<StudentModel> get _dashboardStudents => studentController
+      .activeStudents
+      .where((student) => student.status != 'Inactive')
+      .toList();
 
+  int get totalActiveStudents => _dashboardStudents.length;
+
+  // NOT `_dashboardStudents` here on purpose — this is money the hostel
+  // has actually already received. Same principle as allTimeCollected
+  // below: if a student paid this month (or any past month, via
+  // last6MonthsTrend re-using this same method) and only went Inactive
+  // afterwards, that real payment must not retroactively vanish from
+  // the month it was actually collected in just because of today's
+  // status. Only forward-looking figures (Expected, who-owes, the
+  // active count) drop an Inactive student — money already in hand
+  // never does.
   double _collectedForMonth(String month) {
     return studentController.activeStudents
         .where((student) => student.id != null)
@@ -92,7 +121,7 @@ class DashboardController extends GetxController {
 
   double get expectedThisMonth {
     final month = _currentMonth();
-    return studentController.activeStudents
+    return _dashboardStudents
         .where((student) => student.id != null)
         .fold<double>(0.0, (sum, student) {
       final summary = feeController.computeFeeSummaryForMonth(
@@ -124,7 +153,7 @@ class DashboardController extends GetxController {
   List<StudentModel> get _studentsWhoOweThisMonth {
     final month = _currentMonth();
 
-    return studentController.activeStudents
+    return _dashboardStudents
         .where(
           (student) =>
               student.id != null &&
@@ -209,12 +238,22 @@ class DashboardController extends GetxController {
     // ReceiptController.netCashBox for that side of it). A Cash-mode
     // entry never touches this figure at all.
     final studentCashAccount = receiptController.accountReceipts;
-    final result = opening + collected - expenses + studentCashAccount;
+    // Balance Additions ("Add to Total Balance") — every entry, Cash or
+    // Account, counts fully here: unlike Student Cash above, there's no
+    // "hands out physical cash while it lands in the bank" quirk to this
+    // one — it's simply money coming in, so both sides add straight
+    // through. `opening` itself is untouched by this feature on purpose
+    // (see balance_addition_model.dart) — this is on top of it, not a
+    // replacement for it.
+    final balanceAdded = balanceController.totalAdded;
+    final result =
+        opening + collected - expenses + studentCashAccount + balanceAdded;
 
     debugPrint(
       '[TOTALS] totalAmount = openingBalance($opening) '
       '+ allTimeCollected($collected) − allTimeExpenses($expenses) '
       '+ studentCashAccount($studentCashAccount) '
+      '+ balanceAdded($balanceAdded) '
       '= $result',
     );
     debugPrint(
@@ -291,13 +330,17 @@ class DashboardController extends GetxController {
         .fold<double>(0.0, (sum, expense) => sum + expense.amount);
   }
 
+  // Balance Additions add straight through to whichever box was picked —
+  // no cross-box quirk like Student Cash "Account" entries have. See the
+  // long comment on totalAmount above for why.
   double get cashBox =>
       _feeCashCollected + receiptController.cashReceipts -
-      receiptController.accountReceipts - _expenseCashPaid;
+      receiptController.accountReceipts - _expenseCashPaid +
+      balanceController.totalCashAdded;
 
   double get accountBox =>
       _feeNonCashCollected + receiptController.accountReceipts -
-      _expenseAccountPaid;
+      _expenseAccountPaid + balanceController.totalAccountAdded;
 
   Future<void> setOpeningBalance(double value) {
     debugPrint(
@@ -392,10 +435,37 @@ class DashboardController extends GetxController {
       );
     });
 
-    final combined = [...feeItems, ...expenseItems, ...receiptItems]
-      ..sort((a, b) => b.date.compareTo(a.date));
+    final balanceItems = balanceController.balanceAdditions.map((addition) {
+      return RecentActivityItem(
+        title: 'Added to Total Balance',
+        subtitle: addition.box.label,
+        amount: addition.amount,
+        date: addition.date,
+        isIncome: true,
+      );
+    });
+
+    final combined = [
+      ...feeItems,
+      ...expenseItems,
+      ...receiptItems,
+      ...balanceItems,
+    ]..sort((a, b) => b.date.compareTo(a.date));
 
     return combined.take(6).toList();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Add to Total Balance — the Dashboard's "Add" action. Always a new,
+  // purely additive entry (see BalanceAdditionController) — never edits
+  // or replaces Opening Balance or any past addition.
+  // ---------------------------------------------------------------------------
+
+  Future<bool> addToTotalBalance({
+    required double amount,
+    required BalanceAdditionBox box,
+  }) {
+    return balanceController.addBalance(amount: amount, box: box);
   }
 }
 

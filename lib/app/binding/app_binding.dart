@@ -32,6 +32,11 @@ import 'package:hostel_management/features/receipts/data/datasources/supabase_re
 import 'package:hostel_management/features/receipts/data/repositories/receipt_repository.dart' show ReceiptRepository;
 import 'package:hostel_management/features/receipts/presentation/controllers/receipt_controller.dart' show ReceiptController;
 
+import 'package:hostel_management/features/balance/data/datasources/balance_addition_data_source.dart' show BalanceAdditionDataSource;
+import 'package:hostel_management/features/balance/data/datasources/supabase_balance_addition_data_source.dart' show SupabaseBalanceAdditionDataSource;
+import 'package:hostel_management/features/balance/data/repositories/balance_addition_repository.dart' show BalanceAdditionRepository;
+import 'package:hostel_management/features/balance/presentation/controllers/balance_addition_controller.dart' show BalanceAdditionController;
+
 import '../../core/widgets/app_shell.dart';
 import '../../features/fees/data/datasources/fee_data_source.dart';
 import '../../features/fees/data/datasources/supabase_fee_data_source.dart';
@@ -248,6 +253,28 @@ Get.lazyPut<ReceiptRepository>(
 
 Get.lazyPut<ReceiptController>(
   () => ReceiptController(Get.find<ReceiptRepository>()),
+  fenix: true,
+);
+
+// ---------------------------------------------------------------------------
+// Balance Additions — "Add to Total Balance" on the Dashboard. Its own
+// independent data layer, same pattern as Receipts; DashboardController
+// reads its totals but nothing here reads back into Fees/Expenses/
+// Settings' openingBalance, which this deliberately never touches.
+// ---------------------------------------------------------------------------
+
+Get.lazyPut<BalanceAdditionDataSource>(
+  () => SupabaseBalanceAdditionDataSource(),
+  fenix: true,
+);
+
+Get.lazyPut<BalanceAdditionRepository>(
+  () => BalanceAdditionRepository(Get.find<BalanceAdditionDataSource>()),
+  fenix: true,
+);
+
+Get.lazyPut<BalanceAdditionController>(
+  () => BalanceAdditionController(Get.find<BalanceAdditionRepository>()),
   fenix: true,
 );
   }

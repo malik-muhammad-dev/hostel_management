@@ -828,9 +828,14 @@ return baseFee + serviceAmount;}
   //
   // The client's rule: once a month's fine due day (Settings, default
   // the 9th) has passed and that month is still unpaid, a fine (Settings,
-  // default Rs. 100) applies — automatically, without the admin having
-  // to remember to add it. This exists precisely because the admin
-  // forgetting was the original problem being solved.
+  // default Rs. 100) applies PER DAY late — automatically, without the
+  // admin having to remember to add it. This exists precisely because
+  // the admin forgetting was the original problem being solved.
+  //
+  // "Per day late" counts the due day itself as day 1 — due day 11,
+  // still unpaid on the 11th = Rs. 100; on the 13th = Rs. 300 (11th,
+  // 12th and 13th each contribute one day) — and keeps growing every
+  // day the month stays unpaid, with no cap.
   //
   // Computed live from today's real date every time, the same
   // self-healing approach as Previous Balance / Total Amount elsewhere
@@ -839,8 +844,8 @@ return baseFee + serviceAmount;}
   // there is no stored "fine" row to fall out of sync and nothing to
   // manually clear.
   //
-  // Stacks across every unpaid month whose due day has passed (a student
-  // 3 months behind shows 3x the fine) — mirroring exactly how Previous
+  // Stacks across every unpaid month whose due day has passed (each
+  // one separately escalating per-day) — mirroring exactly how Previous
   // Balance already rolls forward unpaid months. Only counts months
   // on/after `fineEffectiveFrom` (stamped once, to the month this
   // feature was installed) so switching it on never back-fines a student
@@ -860,6 +865,8 @@ return baseFee + serviceAmount;}
 
   /// Fine owed for exactly ONE month — 0 unless that month's fine due
   /// date has already passed and the month still has a pending balance.
+  /// Otherwise, `fineAmount` × the number of days late (due day itself
+  /// counts as day 1) — see the LATE FINE note above.
   ///
   /// Note: "still has a pending balance" is judged from the month's base
   /// fee vs. what's been collected for it (the same `feePending` the
@@ -884,12 +891,22 @@ return baseFee + serviceAmount;}
     if (parsed == null) return 0;
 
     final dueDate = DateTime(parsed.year, parsed.month, settings.fineDueDay.value);
-    if (!DateTime.now().isAfter(dueDate)) return 0;
+
+    // Strip the time-of-day from "now" so the day count is exact no
+    // matter what time it currently is — otherwise comparing against a
+    // midnight `dueDate` would make "today" always read as already
+    // after it, even minutes into the due day itself.
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    if (today.isBefore(dueDate)) return 0;
 
     final summary = computeFeeSummaryForMonth(studentId, feeMonth);
     if (summary.feePending <= 0) return 0;
 
-    return settings.fineAmount.value;
+    // Due day itself is day 1 of the fine (see the class-level comment
+    // above for the worked 11/12/13 example the client confirmed).
+    final daysLate = today.difference(dueDate).inDays + 1;
+    return settings.fineAmount.value * daysLate;
   }
 
   /// Total fine owed by a student across every unpaid month from their

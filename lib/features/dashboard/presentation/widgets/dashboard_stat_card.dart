@@ -9,10 +9,10 @@ class DashboardStatCard extends StatelessWidget {
   final IconData icon;
   final Color accentColor;
 
-  // Optional — when set, a small pencil/edit button is shown in the
-  // card's top-right corner. Only the "Total Amount" card uses this (to
-  // let the opening balance be set/updated); every other card leaves
-  // this null and renders exactly as before.
+  // Optional — when set, a small "add" button is shown in the card's
+  // top-right corner. Only the "Total Amount" card uses this (to open
+  // "Add to Total Balance"); every other card leaves this null and
+  // renders exactly as before.
   final VoidCallback? onEdit;
 
   const DashboardStatCard({
@@ -61,11 +61,11 @@ class DashboardStatCard extends StatelessWidget {
 
               if (onEdit != null)
                 IconButton(
-                  tooltip: 'Set opening balance',
+                  tooltip: 'Add to Total Balance',
                   onPressed: onEdit,
                   visualDensity: VisualDensity.compact,
                   icon: Icon(
-                    Icons.edit_outlined,
+                    Icons.add_circle_outline,
                     size: 16,
                     color: accentColor,
                   ),

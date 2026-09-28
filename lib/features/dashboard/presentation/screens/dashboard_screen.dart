@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../../app/theme/app_colors.dart';
+import '../../../balance/models/balance_addition_model.dart';
 import '../controllers/dashboard_controller.dart';
 import '../widgets/dashboard_greeting_banner.dart';
 import '../widgets/dashboard_skeleton.dart';
@@ -23,33 +24,71 @@ class DashboardScreen extends StatelessWidget {
         .replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (m) => ',');
   }
 
-  Future<void> _showEditOpeningBalanceDialog(
+  // ---------------------------------------------------------------------------
+  // "Add to Total Balance" — always adds a brand-new entry on top of
+  // whatever Cash Box / Account Box / Total Amount already show; never
+  // edits or replaces Opening Balance or any past addition. See
+  // DashboardController.addToTotalBalance / balance_addition_model.dart
+  // for the full reasoning.
+  // ---------------------------------------------------------------------------
+
+  Future<void> _showAddToTotalBalanceDialog(
     BuildContext context,
     DashboardController controller,
   ) async {
-    final textController = TextEditingController(
-      text: controller.openingBalance == 0
-          ? ''
-          : controller.openingBalance.toStringAsFixed(0),
-    );
-
+    final textController = TextEditingController();
     final errorText = ''.obs;
+    final selectedBox = Rxn<BalanceAdditionBox>();
 
-    final result = await showDialog<double>(
+    final result = await showDialog<_BalanceAdditionInput>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Set Opening Balance'),
+          title: const Text('Add to Total Balance'),
           content: Obx(
-            () => TextField(
-              controller: textController,
-              autofocus: true,
-              keyboardType: const TextInputType.numberWithOptions(),
-              decoration: InputDecoration(
-                prefixText: 'Rs. ',
-                hintText: 'e.g. 20000',
-                errorText: errorText.value.isEmpty ? null : errorText.value,
-              ),
+            () => Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: textController,
+                  autofocus: true,
+                  keyboardType: const TextInputType.numberWithOptions(),
+                  decoration: InputDecoration(
+                    prefixText: 'Rs. ',
+                    hintText: 'e.g. 2000',
+                    errorText:
+                        errorText.value.isEmpty ? null : errorText.value,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Add to:',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: RadioListTile<BalanceAdditionBox>(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Cash'),
+                        value: BalanceAdditionBox.cash,
+                        groupValue: selectedBox.value,
+                        onChanged: (value) => selectedBox.value = value,
+                      ),
+                    ),
+                    Expanded(
+                      child: RadioListTile<BalanceAdditionBox>(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Account'),
+                        value: BalanceAdditionBox.account,
+                        groupValue: selectedBox.value,
+                        onChanged: (value) => selectedBox.value = value,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
           actions: [
@@ -70,14 +109,24 @@ class DashboardScreen extends StatelessWidget {
 
                 final value = double.tryParse(cleaned);
 
-                if (cleaned.isEmpty || value == null) {
-                  errorText.value = 'Enter a valid number';
+                if (cleaned.isEmpty || value == null || value <= 0) {
+                  errorText.value = 'Enter a valid amount';
                   return;
                 }
 
-                Navigator.of(context).pop(value);
+                if (selectedBox.value == null) {
+                  errorText.value = 'Select Cash or Account';
+                  return;
+                }
+
+                Navigator.of(context).pop(
+                  _BalanceAdditionInput(
+                    amount: value,
+                    box: selectedBox.value!,
+                  ),
+                );
               },
-              child: const Text('Save'),
+              child: const Text('Add'),
             ),
           ],
         );
@@ -85,7 +134,23 @@ class DashboardScreen extends StatelessWidget {
     );
 
     if (result != null) {
-      await controller.setOpeningBalance(result);
+      final success = await controller.addToTotalBalance(
+        amount: result.amount,
+        box: result.box,
+      );
+
+      // Without this, a failed save (network drop, etc.) would close the
+      // dialog looking exactly like a successful one — Cash/Account/
+      // Total Amount just silently wouldn't have actually moved.
+      if (!success && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Couldn't add to Total Balance — check your connection and try again.",
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -120,8 +185,8 @@ class DashboardScreen extends StatelessWidget {
               controller: controller,
               formatAmount: _formatAmount,
               formatNumber: _formatNumber,
-              onEditOpeningBalance: () =>
-                  _showEditOpeningBalanceDialog(context, controller),
+              onAddToTotalBalance: () =>
+                  _showAddToTotalBalanceDialog(context, controller),
             );
           }),
         ],
@@ -134,13 +199,13 @@ class _DashboardContent extends StatelessWidget {
   final DashboardController controller;
   final String Function(double) formatAmount;
   final String Function(double) formatNumber;
-  final VoidCallback onEditOpeningBalance;
+  final VoidCallback onAddToTotalBalance;
 
   const _DashboardContent({
     required this.controller,
     required this.formatAmount,
     required this.formatNumber,
-    required this.onEditOpeningBalance,
+    required this.onAddToTotalBalance,
   });
 
   @override
@@ -221,10 +286,10 @@ class _DashboardContent extends StatelessWidget {
                 title: 'Total Amount',
                 value: formatAmount(totalAmount),
                 subtitle:
-                    'Opening balance + collected − expenses + Student Cash (Account)',
+                    'Opening balance + collected − expenses + Student Cash (Account) + Added Balance',
                 icon: Icons.account_balance_wallet_rounded,
                 accentColor: const Color(0xFF7C5CBF),
-                onEdit: onEditOpeningBalance,
+                onEdit: onAddToTotalBalance,
               ),
               DashboardStatCard(
                 title: 'Total Cash',
@@ -323,4 +388,13 @@ class _DashboardContent extends StatelessWidget {
       ],
     );
   }
+}
+
+// Just carries the two picks back out of showDialog in one round trip —
+// no meaning outside this file.
+class _BalanceAdditionInput {
+  final double amount;
+  final BalanceAdditionBox box;
+
+  const _BalanceAdditionInput({required this.amount, required this.box});
 }

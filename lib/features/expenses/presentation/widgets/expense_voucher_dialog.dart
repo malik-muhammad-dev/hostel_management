@@ -1,16 +1,28 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:hostel_management/app/theme/app_colors.dart';
 import 'package:hostel_management/features/expenses/models/expense_model.dart';
 import 'package:hostel_management/features/expenses/services/expense_voucher_generator.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 // =============================================================================
 // EXPENSE VOUCHER DIALOG
 //
-// Same pattern as the Fees ReceiptDialog — a live PDF preview with
-// Save/Print/Share built in via the `printing` package. Used both right
-// after adding an expense, and later from the expenses table to
-// re-view/re-download any past expense's voucher.
+// Same pattern as the Fees ReceiptDialog — a live PDF preview with Print
+// built in via the `printing` package. The package's own "Share" icon
+// was removed (allowSharing: false) — on Windows it did nothing useful,
+// just opening the PDF in a browser tab. A "Send via WhatsApp" icon
+// takes its place in the same toolbar instead: saves the voucher PDF to
+// a well-known folder, opens that folder in Explorer so the file is one
+// drag away, and opens WhatsApp Web (already logged in on the staff
+// laptop) so they just pick the chat and drag the file in themselves.
+//
+// Used both right after adding an expense, and later from the expenses
+// table to re-view/re-download any past expense's voucher.
 // =============================================================================
 
 Future<void> showExpenseVoucherDialog(
@@ -27,6 +39,76 @@ class ExpenseVoucherDialog extends StatelessWidget {
   final ExpenseModel expense;
 
   const ExpenseVoucherDialog({super.key, required this.expense});
+
+  // Category + the expense's own date (not today's date) — e.g.
+  // "Voucher_Electricity_Bill_10-Sep-2026" — rather than the voucher
+  // number, so the file name itself tells staff what it is without
+  // opening it. Category is sanitized because a few categories contain
+  // "/" (e.g. "PTCL / Internet Bill"), which isn't a legal character in
+  // a Windows file name.
+  String _fileNameLabel(ExpenseModel expense) {
+    final category = _sanitizeForFileName(expense.category);
+    final date = _formatFileDate(expense.date);
+    return 'Voucher_${category}_$date';
+  }
+
+  String _sanitizeForFileName(String value) {
+    return value
+        .replaceAll(RegExp(r'[<>:"/\\|?*]'), '')
+        .trim()
+        .replaceAll(RegExp(r'\s+'), '_');
+  }
+
+  String _formatFileDate(DateTime date) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    final day = date.day.toString().padLeft(2, '0');
+    return '$day-${months[date.month - 1]}-${date.year}';
+  }
+
+  Future<void> _sendViaWhatsApp(BuildContext context) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+
+    try {
+      final doc = await ExpenseVoucherGenerator.build(expense: expense);
+      final bytes = await doc.save();
+
+      // Same folder used for fee receipts, so staff only have to
+      // remember one place — Documents/ONIMS Receipts.
+      final documentsDir = await getApplicationDocumentsDirectory();
+      final folder = Directory(p.join(documentsDir.path, 'ONIMS Receipts'));
+      if (!await folder.exists()) {
+        await folder.create(recursive: true);
+      }
+
+      final file = File(
+        p.join(folder.path, '${_fileNameLabel(expense)}.pdf'),
+      );
+      await file.writeAsBytes(bytes);
+
+      // Open the folder first so the file is visible and ready to drag...
+      await launchUrl(Uri.file(folder.path));
+      // ...then open WhatsApp Web so staff can pick the chat.
+      await launchUrl(
+        Uri.parse('https://web.whatsapp.com'),
+        mode: LaunchMode.externalApplication,
+      );
+
+      messenger?.showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Voucher saved to "ONIMS Receipts" — drag it into the chat on WhatsApp.',
+          ),
+        ),
+      );
+    } catch (e) {
+      messenger?.showSnackBar(
+        SnackBar(content: Text('Could not open WhatsApp: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -69,26 +151,26 @@ class ExpenseVoucherDialog extends StatelessWidget {
                   return doc.save();
                 },
                 allowPrinting: true,
-                allowSharing: true,
+                allowSharing: false,
                 canChangePageFormat: false,
                 canChangeOrientation: false,
                 canDebug: false,
                 pdfFileName: '${_fileNameLabel(expense)}.pdf',
+                actions: [
+                  IconButton(
+                    tooltip: 'Send via WhatsApp',
+                    onPressed: () => _sendViaWhatsApp(context),
+                    icon: const Icon(
+                      Icons.chat_rounded,
+                      color: Color(0xFF25D366),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ),
       ),
     );
-  }
-
-  // Matches the "Voucher No." shown inside the PDF itself
-  // (ExpenseVoucherGenerator) rather than the raw UUID, so a saved file's
-  // name is something the client can actually read out.
-  String _fileNameLabel(ExpenseModel expense) {
-    if (expense.voucherNo != null) {
-      return 'Voucher_EXP-${expense.voucherNo.toString().padLeft(4, '0')}';
-    }
-    return expense.id == null ? 'Voucher_draft' : 'Voucher_EXP-PENDING';
   }
 }
