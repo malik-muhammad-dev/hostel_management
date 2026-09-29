@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 
+import '../../../dashboard/presentation/controllers/dashboard_controller.dart';
 import '../../../expenses/presentation/controllers/expense_controller.dart';
 import '../../../fees/presentation/controllers/fee_controller.dart';
 import '../../../students/presentation/controllers/student_controller.dart';
@@ -17,6 +18,12 @@ class ReportsController extends GetxController {
 
   final StudentController studentController =
       Get.find<StudentController>();
+
+  // Reused only for the "All-Time" section below (lifetimeTotalAmount and
+  // its breakdown) — not for anything month-scoped above, which already
+  // has its own independent logic.
+  final DashboardController dashboardController =
+      Get.find<DashboardController>();
 
   // ===========================================================================
   // SELECTED MONTH
@@ -109,4 +116,36 @@ class ReportsController extends GetxController {
   double get netPosition {
     return totalIncome - totalExpenses;
   }
+
+  // ===========================================================================
+  // ALL-TIME TOTAL (moved here from the Dashboard)
+  //
+  // This used to be the Dashboard's headline "Total Amount" card. The
+  // client kept reading "Total Amount" as "how much money do I have
+  // right now," but this figure is actually a lifetime running total
+  // (opening balance + everything ever collected − everything ever
+  // spent) — it only ever grows, and drifts further from "cash on hand"
+  // every month. The Dashboard's "Total Amount" card now shows Cash +
+  // Account instead (what's actually on hand today), and this lifetime
+  // figure lives here as a historical record instead, correctly filed
+  // under Reports rather than competing with the "right now" numbers on
+  // the Dashboard.
+  //
+  // Reuses DashboardController's own getters rather than recomputing the
+  // formula here, so this can never drift from what the Dashboard used
+  // to show.
+  // ===========================================================================
+
+  double get lifetimeTotalAmount => dashboardController.totalAmount;
+
+  double get lifetimeOpeningBalance => dashboardController.openingBalance;
+
+  double get lifetimeCollected => dashboardController.allTimeCollected;
+
+  double get lifetimeExpenses => dashboardController.allTimeExpenses;
+
+  double get lifetimeStudentCashAccount =>
+      dashboardController.studentCashAccountTotal;
+
+  double get lifetimeBalanceAdded => dashboardController.balanceAddedTotal;
 }

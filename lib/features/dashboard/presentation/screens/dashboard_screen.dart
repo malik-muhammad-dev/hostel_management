@@ -237,9 +237,29 @@ class _DashboardContent extends StatelessWidget {
 
             final totalActiveStudents = controller.totalActiveStudents;
             final expensesThisMonth = controller.expensesThisMonth;
-            final totalAmount = controller.totalAmount;
             final cash = controller.cashBox;
             final account = controller.accountBox;
+
+            // "Total Amount" is deliberately Cash + Account, not the old
+            // lifetime running total (opening balance + all-time
+            // collected − all-time expenses + ...). The client kept
+            // reading "Total Amount" as "how much money do I have right
+            // now" — which is exactly what Cash + Account already means —
+            // while the lifetime figure only ever grows and drifts
+            // further from "on hand" every month, causing the same
+            // confusion on repeat. That lifetime figure still exists —
+            // it moved to Reports → Financial Summary ("Total Collected
+            // (All-Time)") as a historical record instead of the
+            // headline "right now" number.
+            final totalOnHand = cash + account;
+
+            final totalAmountTooltip =
+                'How Rs. ${formatNumber(totalOnHand)} is made up:\n'
+                'Total Cash: Rs. ${formatNumber(cash)}\n'
+                '+ Total Account: Rs. ${formatNumber(account)}\n\n'
+                'This is what the hostel actually has on hand right now. '
+                'It\'s different from the hostel\'s total lifetime '
+                'collections — see Reports → Financial Summary for that.';
 
             final cards = [
               DashboardStatCard(
@@ -284,12 +304,19 @@ class _DashboardContent extends StatelessWidget {
               ),
               DashboardStatCard(
                 title: 'Total Amount',
-                value: formatAmount(totalAmount),
-                subtitle:
-                    'Opening balance + collected − expenses + Student Cash (Account) + Added Balance',
+                value: formatAmount(totalOnHand),
+                // Now literally "Total Cash + Total Account" (the two
+                // cards right below) — this is the number the client
+                // actually means by "Total Amount": money on hand today,
+                // not the lifetime running total. See the long comment
+                // above (where totalOnHand is computed) for why this
+                // changed.
+                subtitle: 'Total Cash + Total Account — money on hand '
+                    'right now',
                 icon: Icons.account_balance_wallet_rounded,
                 accentColor: const Color(0xFF7C5CBF),
                 onEdit: onAddToTotalBalance,
+                infoTooltip: totalAmountTooltip,
               ),
               DashboardStatCard(
                 title: 'Total Cash',

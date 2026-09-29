@@ -39,29 +39,69 @@ class DashboardController extends GetxController {
   ];
 
   // ---------------------------------------------------------------------------
-  // Still-loading check — true only on the very first load, before ANY
-  // of the four underlying controllers has ever fetched anything. Once
-  // real data has loaded once, this stays false forever after, even
-  // while a quiet background refresh (from real-time sync) is running —
-  // the skeleton should never flash back over data that's already on
-  // screen, only stand in before there's anything to show at all.
+  // Still-loading check — true until EVERY one of the five underlying
+  // controllers has completed its very first load (success or failure,
+  // doesn't matter — just "isLoading went back to false at least once").
+  //
+  // Previously this flipped off as soon as ANY ONE of the five had
+  // non-empty data, even while the others were still mid-fetch — right
+  // after login, whichever source came back first (say, students) made
+  // the skeleton disappear early and showed the real cards built from
+  // partial data (fees/expenses/etc. still missing), which is exactly
+  // what looked like "wrong figures for 2-3 seconds" before the rest
+  // caught up and the numbers corrected themselves a moment later.
+  // Latching on "loaded at least once" per source, instead of "not empty
+  // right now," closes that gap: the skeleton now stays up until all
+  // five are genuinely ready, then the real content appears once, fully
+  // correct — no in-between flash.
+  //
+  // Each latch is one-way — once a source reports done, it stays "done"
+  // forever after, even during a later background refresh or a CRUD
+  // action elsewhere that happens to reuse the same isLoading flag (same
+  // reasoning as before: the skeleton must never flash back over data
+  // that's already on screen).
   // ---------------------------------------------------------------------------
 
+  final _studentsLoadedOnce = false.obs;
+  final _feesLoadedOnce = false.obs;
+  final _expensesLoadedOnce = false.obs;
+  final _receiptsLoadedOnce = false.obs;
+  final _balanceLoadedOnce = false.obs;
+
+  @override
+  void onInit() {
+    super.onInit();
+
+    _latchLoadedOnce(studentController.isLoading, _studentsLoadedOnce);
+    _latchLoadedOnce(feeController.isLoading, _feesLoadedOnce);
+    _latchLoadedOnce(expenseController.isLoading, _expensesLoadedOnce);
+    _latchLoadedOnce(receiptController.isLoading, _receiptsLoadedOnce);
+    _latchLoadedOnce(balanceController.isLoading, _balanceLoadedOnce);
+  }
+
+  // Marks `latch` true the moment `source` is (or becomes) false — i.e.
+  // the first time that controller's load finishes — and never unmarks
+  // it afterwards no matter how many more times `source` toggles later.
+  // Checked once immediately (covers a controller that was already done
+  // loading by the time this wired up) and then on every future change.
+  void _latchLoadedOnce(RxBool source, RxBool latch) {
+    if (!source.value) {
+      latch.value = true;
+    }
+
+    ever(source, (bool loading) {
+      if (!loading) {
+        latch.value = true;
+      }
+    });
+  }
+
   bool get isInitialLoading {
-    final anyLoading = studentController.isLoading.value ||
-        feeController.isLoading.value ||
-        expenseController.isLoading.value ||
-        receiptController.isLoading.value ||
-        balanceController.isLoading.value;
-
-    final allEmpty = studentController.students.isEmpty &&
-        feeController.payments.isEmpty &&
-        feeController.transactions.isEmpty &&
-        expenseController.expenses.isEmpty &&
-        receiptController.receipts.isEmpty &&
-        balanceController.balanceAdditions.isEmpty;
-
-    return anyLoading && allEmpty;
+    return !(_studentsLoadedOnce.value &&
+        _feesLoadedOnce.value &&
+        _expensesLoadedOnce.value &&
+        _receiptsLoadedOnce.value &&
+        _balanceLoadedOnce.value);
   }
 
   String _monthKey(DateTime date) {
@@ -266,6 +306,15 @@ class DashboardController extends GetxController {
   }
 
   double get openingBalance => settingsController.openingBalance.value;
+
+  // Exposed purely so the UI can explain totalAmount's breakdown to the
+  // client (the "Total Amount" card's info tooltip) — same two pieces
+  // already used inside totalAmount above, just given their own public
+  // getters instead of staying as local variables only that method
+  // could see.
+  double get studentCashAccountTotal => receiptController.accountReceipts;
+
+  double get balanceAddedTotal => balanceController.totalAdded;
 
   // ---------------------------------------------------------------------------
   // Cash / Account — whole-app totals (confirmed with the client,

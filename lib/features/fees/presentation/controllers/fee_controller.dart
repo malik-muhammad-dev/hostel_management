@@ -548,11 +548,27 @@ Future<void> refreshServiceAmountsForStudent(
   // Collected figure).
   // ===========================================================================
 
+  // An Inactive student is deliberately excluded from every FORWARD-
+  // LOOKING fee figure below (Total Expected, Outstanding, Overdue, and
+  // the visible Student Fee Records list in fees_screen.dart) — client's
+  // explicit instruction: once a student is Inactive, her fee should be
+  // "completely off," not just hidden on the Dashboard while still
+  // showing up here. This is NOT applied to `collected` just below —
+  // money she genuinely already paid must never retroactively vanish
+  // from history just because her status changed later (same principle
+  // as DashboardController.allTimeCollected/_collectedForMonth). Still
+  // excludes Archived too, same as `activeStudents` always has.
+  List<StudentModel> _currentFeeStudents(StudentController studentController) {
+    return studentController.activeStudents
+        .where((student) => student.status != 'Inactive')
+        .toList();
+  }
+
   double get totalExpected {
     final studentController = Get.find<StudentController>();
 
     if (showAllMonths.value) {
-      return studentController.activeStudents
+      return _currentFeeStudents(studentController)
           .where((student) => student.id != null)
           .fold<double>(0.0, (sum, student) {
         final summary = computeFeeSummary(student.id!);
@@ -564,7 +580,7 @@ Future<void> refreshServiceAmountsForStudent(
 
     if (month.isEmpty) return 0.0;
 
-    return studentController.activeStudents
+    return _currentFeeStudents(studentController)
         .where((student) => student.id != null)
         .fold<double>(0.0, (sum, student) {
       final summary = computeFeeSummaryForMonth(student.id!, month);
@@ -596,7 +612,44 @@ Future<void> refreshServiceAmountsForStudent(
     });
   }
 
-  double get outstanding => totalExpected - collected;
+  // NOT `totalExpected - collected` — that was a NET total, and a net
+  // total lets one student's overpayment (e.g. a late fine folded into
+  // their payment amount, or a generous discount) silently cancel out
+  // another student's real, unpaid balance in the sum. That's exactly
+  // what confused the client: a student who genuinely owed Rs 13,000
+  // was hidden behind a harmless-looking "Rs 5,400" because ~20 other
+  // students each showed a few hundred rupees of "overpayment" that
+  // netted against her. Outstanding must only ever ADD what a student
+  // genuinely still owes — an overpaid/discounted student contributes
+  // 0 to this total, never a negative number, so the figure always
+  // reflects real money still owed, the same way `overdue` below
+  // already does via fineForSingleMonth's own `feePending <= 0` check.
+  double get outstanding {
+    final studentController = Get.find<StudentController>();
+
+    double clampedPending(StudentFeeSummary summary) {
+      return summary.feePending < 0 ? 0.0 : summary.feePending;
+    }
+
+    if (showAllMonths.value) {
+      return _currentFeeStudents(studentController)
+          .where((student) => student.id != null)
+          .fold<double>(0.0, (sum, student) {
+        final summary = computeFeeSummary(student.id!);
+        return sum + clampedPending(summary);
+      });
+    }
+
+    final month = feeTableMonth.value;
+    if (month.isEmpty) return 0.0;
+
+    return _currentFeeStudents(studentController)
+        .where((student) => student.id != null)
+        .fold<double>(0.0, (sum, student) {
+      final summary = computeFeeSummaryForMonth(student.id!, month);
+      return sum + clampedPending(summary);
+    });
+  }
 
   // Total Late Fine currently owed, summed across the same set of
   // students/months the two figures above are scoped to. Always
@@ -605,12 +658,12 @@ Future<void> refreshServiceAmountsForStudent(
   // not a historical ledger total.
   double get overdue {
     final studentController = Get.find<StudentController>();
-    final activeStudents = studentController.activeStudents
+    final currentStudents = _currentFeeStudents(studentController)
         .where((student) => student.id != null);
 
     if (showAllMonths.value) {
       final currentMonth = _currentFeeMonth();
-      return activeStudents.fold<double>(
+      return currentStudents.fold<double>(
         0.0,
         (sum, student) => sum + totalFineOwed(student.id!, currentMonth),
       );
@@ -622,7 +675,7 @@ Future<void> refreshServiceAmountsForStudent(
     // A specific month is selected — match totalExpected/collected's
     // scoping (that month only, not the cumulative stack) so the three
     // figures stay comparable side by side.
-    return activeStudents.fold<double>(
+    return currentStudents.fold<double>(
       0.0,
       (sum, student) => sum + fineForSingleMonth(student.id!, month),
     );

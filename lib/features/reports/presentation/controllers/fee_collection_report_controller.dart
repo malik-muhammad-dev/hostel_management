@@ -50,6 +50,18 @@ class FeeCollectionReportController extends GetxController {
   // STUDENT SUMMARIES
   // ===========================================================================
 
+  // An Inactive student is excluded here — client's explicit
+  // instruction: her fee should be "completely off" everywhere (Fees
+  // screen, this report, the visible table below), not just hidden on
+  // the Dashboard. Archived students were already excluded via
+  // `activeStudents`; this narrows it further, matching
+  // FeeController.totalExpected/outstanding/overdue's own filtering.
+  List<StudentModel> get _currentStudents {
+    return studentController.activeStudents
+        .where((student) => student.status != 'Inactive')
+        .toList();
+  }
+
   List<StudentFeeSummary> get studentSummaries {
     final month = selectedMonth.value;
 
@@ -57,7 +69,7 @@ class FeeCollectionReportController extends GetxController {
       return [];
     }
 
-    return studentController.activeStudents
+    return _currentStudents
         .where((student) => student.id != null)
         .map(
           (student) =>
@@ -81,19 +93,42 @@ class FeeCollectionReportController extends GetxController {
     );
   }
 
+  // Deliberately NOT scoped to `studentSummaries`/`_currentStudents` —
+  // money a student genuinely already paid must never retroactively
+  // vanish from this report just because she went Inactive afterward
+  // (same principle as DashboardController.allTimeCollected/
+  // _collectedForMonth). Total Expected/Outstanding above answer "what
+  // does the hostel currently expect to collect," which rightly drops
+  // an Inactive student; Total Collected answers "what has actually
+  // been received," which never should.
   double get totalCollected {
-    return studentSummaries.fold<double>(
-      0.0,
-      (total, summary) =>
-          total + summary.feeSubmitted,
-    );
+    final month = selectedMonth.value;
+    if (month.isEmpty) return 0.0;
+
+    return studentController.activeStudents
+        .where((student) => student.id != null)
+        .fold<double>(0.0, (total, student) {
+      final summary = feeController.computeFeeSummaryForMonth(
+        student.id!,
+        month,
+      );
+      return total + summary.feeSubmitted;
+    });
   }
 
+  // NOT a straight sum of `feePending` — that lets one student's
+  // overpayment (a late fine folded into their payment amount, or a
+  // generous discount) go negative and silently cancel out another
+  // student's genuinely unpaid balance in the total, the exact same
+  // issue fixed on FeeController.outstanding (see its comment for the
+  // full explanation). Each student's contribution is clamped at a
+  // floor of 0 here too, so this report's Outstanding always reflects
+  // real money still owed, never a netted-down figure.
   double get totalOutstanding {
     return studentSummaries.fold<double>(
       0.0,
       (total, summary) =>
-          total + summary.feePending,
+          total + (summary.feePending < 0 ? 0.0 : summary.feePending),
     );
   }
 
@@ -110,7 +145,7 @@ class FeeCollectionReportController extends GetxController {
   // ===========================================================================
 
   List<StudentModel> get students {
-    return studentController.activeStudents;
+    return _currentStudents;
   }
 
   StudentFeeSummary? summaryForStudent(

@@ -5,6 +5,7 @@ import 'package:hostel_management/features/reports/presentation/controllers/repo
 
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/widgets/app_shell.dart';
+import '../../../dashboard/presentation/widgets/dashboard_stat_card.dart';
 
 import '../widgets/net_position_summary.dart';
 
@@ -49,11 +50,86 @@ class NetPositionReportScreen extends StatelessWidget {
                       controller.netPosition,
                 ),
               ),
+              const SizedBox(height: 28),
+              const Text(
+                'All-Time',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Historical totals since the hostel started — these '
+                'never reset, unlike the month above.',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Obx(() => _buildAllTimeCard(controller)),
             ],
           ),
         ),
       ),
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // "Total Collected (All-Time)" — this is the figure that used to be the
+  // Dashboard's headline "Total Amount" card. It moved here because it's
+  // a lifetime running total (only ever grows), not a "right now" figure —
+  // see the long comment on ReportsController.lifetimeTotalAmount for the
+  // full reasoning.
+  // ---------------------------------------------------------------------------
+
+  Widget _buildAllTimeCard(ReportsController controller) {
+    final total = controller.lifetimeTotalAmount;
+    final opening = controller.lifetimeOpeningBalance;
+    final collected = controller.lifetimeCollected;
+    final expenses = controller.lifetimeExpenses;
+    final studentCashAccount = controller.lifetimeStudentCashAccount;
+    final balanceAdded = controller.lifetimeBalanceAdded;
+
+    final tooltip = 'How Rs. ${_formatNumber(total)} is worked out:\n'
+        'Opening balance: Rs. ${_formatNumber(opening)}\n'
+        '+ Collected (all-time): Rs. ${_formatNumber(collected)}\n'
+        '− Expenses (all-time): Rs. ${_formatNumber(expenses)}\n'
+        '+ Student Cash (Account): Rs. ${_formatNumber(studentCashAccount)}\n'
+        '+ Added Balance: Rs. ${_formatNumber(balanceAdded)}\n\n'
+        'This is every rupee the hostel has taken in since the '
+        'beginning — not what\'s currently on hand. For that, see the '
+        'Dashboard\'s Total Amount card (Cash + Account).';
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cardWidth = constraints.maxWidth > 700
+            ? (constraints.maxWidth - 24) / 3
+            : constraints.maxWidth;
+
+        return SizedBox(
+          width: cardWidth,
+          child: DashboardStatCard(
+            title: 'Total Collected (All-Time)',
+            value: 'Rs. ${_formatNumber(total)}',
+            subtitle: 'Every rupee taken in since day one',
+            icon: Icons.account_balance_wallet_rounded,
+            accentColor: const Color(0xFF7C5CBF),
+            infoTooltip: tooltip,
+          ),
+        );
+      },
+    );
+  }
+
+  String _formatNumber(double amount) {
+    final sign = amount < 0 ? '-' : '';
+    return '$sign${amount.abs().toStringAsFixed(0).replaceAllMapped(
+          RegExp(r'\B(?=(\d{3})+(?!\d))'),
+          (match) => ',',
+        )}';
   }
 
   Widget _buildHeader() {

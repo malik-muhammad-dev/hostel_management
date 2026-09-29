@@ -15,6 +15,15 @@ class DashboardStatCard extends StatelessWidget {
   // renders exactly as before.
   final VoidCallback? onEdit;
 
+  // Optional — when set, a small info icon appears next to the title.
+  // Hovering/long-pressing it shows this text. Added specifically for
+  // "Total Amount," whose number legitimately differs from Total Cash +
+  // Total Account (client kept asking where the gap came from) — this
+  // gives a hover-away explanation with the actual live breakdown,
+  // instead of the client having to ask each time. Any other card can
+  // use it too; leaving it null renders exactly as before.
+  final String? infoTooltip;
+
   const DashboardStatCard({
     super.key,
     required this.title,
@@ -23,6 +32,7 @@ class DashboardStatCard extends StatelessWidget {
     required this.icon,
     this.accentColor = AppColors.primary,
     this.onEdit,
+    this.infoTooltip,
   });
 
   @override
@@ -60,14 +70,30 @@ class DashboardStatCard extends StatelessWidget {
               ),
 
               if (onEdit != null)
-                IconButton(
-                  tooltip: 'Add to Total Balance',
-                  onPressed: onEdit,
-                  visualDensity: VisualDensity.compact,
-                  icon: Icon(
-                    Icons.add_circle_outline,
-                    size: 16,
-                    color: accentColor,
+                Tooltip(
+                  message: 'Add to Total Balance',
+                  child: InkWell(
+                    onTap: onEdit,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      width: 26,
+                      height: 26,
+                      // A filled icon on a solid tinted background — the
+                      // old plain IconButton used an *outline* icon with
+                      // no background at all, which on this card's very
+                      // light tint was just a thin stroke of near-white
+                      // on near-white and was genuinely hard to see, even
+                      // though the tap target underneath it still worked.
+                      decoration: BoxDecoration(
+                        color: accentColor.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.add_circle,
+                        size: 16,
+                        color: accentColor,
+                      ),
+                    ),
                   ),
                 ),
             ],
@@ -87,13 +113,36 @@ class DashboardStatCard extends StatelessWidget {
 
           const SizedBox(height: 2),
 
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+
+              if (infoTooltip != null) ...[
+                const SizedBox(width: 4),
+                Tooltip(
+                  message: infoTooltip!,
+                  textStyle: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.white,
+                  ),
+                  padding: const EdgeInsets.all(10),
+                  margin: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Icon(
+                    Icons.info_outline,
+                    size: 13,
+                    color: accentColor.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ],
           ),
 
           const SizedBox(height: 1),

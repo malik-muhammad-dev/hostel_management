@@ -235,14 +235,26 @@ class FeesScreen extends StatelessWidget {
             final showAll = feeController.showAllMonths.value;
             final month = feeController.feeTableMonth.value;
 
+            // An Inactive student is excluded from this table entirely —
+            // client's explicit instruction: her fee should be
+            // "completely off," not just hidden on the Dashboard while
+            // still showing up here. Matches FeeController.totalExpected/
+            // outstanding/overdue above, which already exclude her the
+            // same way — this list and those totals must agree on who
+            // counts as "currently owing," or the table and the summary
+            // cards above it would disagree again.
+            final currentStudents = studentController.activeStudents
+                .where((student) => student.status != 'Inactive')
+                .toList();
+
             // In single-month mode, a student who wasn't enrolled yet
             // for that month shouldn't appear as a row at all — showing
             // them with an all-zero "Paid" entry (balance 0 reads as
             // "Paid") is misleading, since they were never charged
             // anything in the first place.
             final visibleStudents = showAll
-                ? studentController.activeStudents
-                : studentController.activeStudents
+                ? currentStudents
+                : currentStudents
                     .where(
                       (student) =>
                           feeController.isStudentEnrolledInMonth(
